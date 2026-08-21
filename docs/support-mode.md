@@ -1,7 +1,9 @@
 # ALTR MCP Support Read-Only Mode
 
-Support mode exposes only the 71 lookup tools and withholds the 85 that change
-anything. Set `SUPPORT_MODE=true` to enable it.
+Support mode exposes only the 71 lookup tools and withholds the other 85:
+everything that changes state, plus the four detokenization tools, which
+change nothing but return real customer values. Set `SUPPORT_MODE=true` to
+enable it.
 
 On stdio, `tools/list` reports 72 in that mode: the 71 lookups plus
 `enter_support_mode`, which is present but inert there so that a prompt whose
@@ -19,8 +21,8 @@ Two things, together:
 
 1. **Restricts the tool set.** The 85 tools that create, update, delete,
    disconnect, register, deregister, trigger, approve, deny, restore, revoke,
-   rotate, import, or tokenize are removed from `tools/list` and rejected on
-   `tools/call` with a `support read-only mode` error.
+   rotate, import, tokenize, or detokenize are removed from `tools/list` and
+   rejected on `tools/call` with a `support read-only mode` error.
 2. **Appends operating instructions.** The contents of
    `altr_mcp/instructions_support.md` are appended to the server instructions
    sent to the client, so the assistant is told what the mode is for and what
@@ -211,7 +213,7 @@ in both directions.
 
 **It is an allow-list, not a deny-list.** A tool added in a future release is
 unavailable in support mode until it is added to `SUPPORT_ALLOWED_TOOLS` on
-purpose. A deny-list of the 85 mutating tools would expose anything new by
+purpose. A deny-list of the 85 withheld tools would expose anything new by
 default, which is the wrong failure direction for a safety feature.
 
 **The allow-list is tested against the live registry.**

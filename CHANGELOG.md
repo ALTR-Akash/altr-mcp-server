@@ -28,8 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   investigations. When enabled, only the 71 lookup tools are exposed, plus an
   inert `enter_support_mode` on stdio; the 85 tools that create, update,
   delete, disconnect, register, deregister, trigger, approve, deny, restore,
-  revoke, rotate, import, or tokenize are removed from `tools/list` and
-  rejected on `tools/call`. Enabling it also appends
+  revoke, rotate, import, tokenize, or detokenize are removed from
+  `tools/list` and rejected on `tools/call`. Enabling it also appends
   `altr_mcp/instructions_support.md` to the server instructions sent to the
   client. Composes with `RESTRICTED_TOOLS`; both filters apply. See
   `docs/support-mode.md`.

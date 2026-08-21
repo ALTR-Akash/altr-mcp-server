@@ -28,6 +28,39 @@ def _clear_cache():
     get_controller.cache_clear()
 
 
+@pytest.fixture
+def _isolated_mcp(monkeypatch):
+    """Give main() a throwaway server, so its mutations do not leak.
+
+    main() mutates the module-level mcp in two ways that nothing undoes:
+    it registers prompts, and FastMCP has no public way to unregister one;
+    and it appends a ToolRestrictionMiddleware, which accumulates. A test
+    that runs main() with SUPPORT_MODE or RESTRICTED_TOOLS set therefore
+    leaves an allow-list filter attached to the real server for every test
+    after it. Prefer this fixture for any test where main() gets past
+    settings validation; the --version and missing-env tests exit before
+    the first mutation, so they do not need it.
+    """
+    from fastmcp import FastMCP
+
+    from altr_mcp import server
+
+    # Built like the real module-level server, both arguments included.
+    # main() only reassigns instructions when it has something to append,
+    # so a bare FastMCP would leave them None; omitting version= would
+    # report fastmcp's own, which is the bug server.py:26 records.
+    monkeypatch.setattr(
+        server,
+        "mcp",
+        FastMCP(
+            "test",
+            instructions=server._INSTRUCTIONS,
+            version=altr_mcp.__version__,
+        ),
+    )
+    return server
+
+
 def test_main_exits_on_missing_env(monkeypatch, capsys):
     """main() exits 1 with a helpful message if ORG_ID/MAPI_* are unset."""
     monkeypatch.delenv("ORG_ID", raising=False)
@@ -100,30 +133,6 @@ def test_main_http_transport_passes_host_and_port(monkeypatch, _isolated_mcp):
         # after _configure_logging and bypasses the scrubbing handler.
         "uvicorn_config": {"log_config": None},
     }
-
-
-@pytest.fixture
-def _isolated_mcp(monkeypatch):
-    """Give main() a throwaway server, so its mutations do not leak.
-
-    main() mutates the module-level mcp in two ways that nothing undoes:
-    it registers prompts, and FastMCP has no public way to unregister one;
-    and it appends a ToolRestrictionMiddleware, which accumulates. A test
-    that runs main() with SUPPORT_MODE or RESTRICTED_TOOLS set therefore
-    leaves an allow-list filter attached to the real server for every test
-    after it. Prefer this fixture for any test that calls main().
-    """
-    from fastmcp import FastMCP
-
-    from altr_mcp import server
-
-    # Built with the base instructions, like the real module-level server.
-    # main() only reassigns instructions when it has something to append,
-    # so a bare FastMCP would leave them None and misrepresent production.
-    monkeypatch.setattr(
-        server, "mcp", FastMCP("test", instructions=server._INSTRUCTIONS)
-    )
-    return server
 
 
 def _run_main_capturing_middleware(monkeypatch):
