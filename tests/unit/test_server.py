@@ -28,16 +28,6 @@ def _clear_cache():
     get_controller.cache_clear()
 
 
-@pytest.fixture
-def _restore_instructions():
-    """main() mutates the module-level mcp; put it back afterwards."""
-    from altr_mcp import server
-
-    original = server.mcp.instructions
-    yield
-    server.mcp.instructions = original
-
-
 def test_main_exits_on_missing_env(monkeypatch, capsys):
     """main() exits 1 with a helpful message if ORG_ID/MAPI_* are unset."""
     monkeypatch.delenv("ORG_ID", raising=False)
@@ -60,7 +50,7 @@ def test_main_exits_on_missing_env(monkeypatch, capsys):
     assert "MAPI_SECRET" in captured.err
 
 
-def test_main_stdio_transport_default(monkeypatch):
+def test_main_stdio_transport_default(monkeypatch, _isolated_mcp):
     """main() with valid env starts the server on stdio by default."""
     monkeypatch.setenv("ORG_ID", "org")
     monkeypatch.setenv("MAPI_KEY", "key")
@@ -82,7 +72,7 @@ def test_main_stdio_transport_default(monkeypatch):
     assert captured_kwargs == {"transport": "stdio"}
 
 
-def test_main_http_transport_passes_host_and_port(monkeypatch):
+def test_main_http_transport_passes_host_and_port(monkeypatch, _isolated_mcp):
     """main() with streamable-http transport passes host/port to run()."""
     monkeypatch.setenv("ORG_ID", "org")
     monkeypatch.setenv("MAPI_KEY", "key")
