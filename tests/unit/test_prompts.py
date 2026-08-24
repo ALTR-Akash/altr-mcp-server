@@ -64,3 +64,17 @@ def test_output_is_always_exactly_one_well_formed_span():
         assert out.count("`") == 2, value      # no interior delimiter
         assert "\n" not in out, value          # the span stays inline
         assert len(out) > 2, value             # not an empty span
+
+
+def test_a_long_value_survives_intact():
+    """The transform's losses are enumerated in _q()'s docstring.
+
+    Nothing else pins that set closed: the structural clauses above all
+    hold for a _q() that silently truncated every value, and the
+    longest value asserted by equality anywhere else is 19 characters.
+    A real argument -- a fully qualified column, a sidecar FQDN -- is
+    longer than that, and a fidelity regression would reach a customer
+    as a wrong-looking identifier with nothing objecting.
+    """
+    fqn = "PROD_ANALYTICS.PUBLIC.CUSTOMER_ACCOUNTS.SOCIAL_SECURITY_NUMBER"
+    assert _q(fqn) == "`" + fqn + "`"
