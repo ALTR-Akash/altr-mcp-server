@@ -37,14 +37,20 @@ _ARM = (
 def _q(value: str) -> str:
     """Delimit a caller-supplied value so it cannot close its own quoting.
 
-    A literal backquote in a value would end the fence and let the rest
-    of it render as server-authored prose — precisely what the preamble
-    prevents by scoping its disclaimer to the backquoted span. Swapped
-    for an apostrophe rather than escaped: this is prose for a model,
-    not a data channel, and a name carrying a backquote is far likelier
-    to be pasted ticket noise than a real identifier.
+    Two shapes break a fence, and both are neutralized here. A literal
+    backquote ends it outright. A blank line ends the paragraph the
+    span lives in, so the tail renders as server-authored prose and can
+    even forge a resumption of the sentence it interrupted — which is
+    exactly what the preamble prevents by scoping its disclaimer to the
+    delimited span.
+
+    Collapsed rather than escaped: this is prose for a model, not a
+    data channel, so there is no parser to escape for, and an
+    identifier spanning paragraphs is pasted ticket noise. The
+    backquote swap is the one lossy part — a MySQL `db`.`table` comes
+    back as 'db'.'table', which a model still resolves.
     """
-    return "`" + value.replace("`", "'") + "`"
+    return "`" + " ".join(value.replace("`", "'").split()) + "`"
 
 
 def register(mcp: FastMCP) -> None:
