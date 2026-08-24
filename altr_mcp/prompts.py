@@ -46,11 +46,19 @@ def _q(value: str) -> str:
 
     Collapsed rather than escaped: this is prose for a model, not a
     data channel, so there is no parser to escape for, and an
-    identifier spanning paragraphs is pasted ticket noise. The
-    backquote swap is the one lossy part — a MySQL `db`.`table` comes
-    back as 'db'.'table', which a model still resolves.
+    identifier spanning paragraphs is pasted ticket noise. Both edits
+    are lossy — a MySQL `db`.`table` comes back as 'db'.'table', and a
+    quoted identifier carrying repeated or edge whitespace ("Customer
+    Table") comes back squeezed and trimmed. A model resolves both.
+
+    A value that collapses to nothing gets a placeholder rather than an
+    empty span. "``" is a length-2 backquote string, not a delimiter
+    pair, so two of them pair with *each other* across the prose
+    between — framing the prompt's own instructions as caller-supplied
+    data the preamble has just disclaimed.
     """
-    return "`" + " ".join(value.replace("`", "'").split()) + "`"
+    collapsed = " ".join(value.replace("`", "'").split())
+    return "`" + (collapsed or "(not supplied)") + "`"
 
 
 def register(mcp: FastMCP) -> None:

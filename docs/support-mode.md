@@ -222,8 +222,11 @@ recent thing the model read. The arguments are table names, roles, job IDs and
 emails, pasted out of customer tickets, so each is delimited and the preamble
 disclaims the delimited spans as data. Delimiting is enforced rather than
 assumed: a value that would close its own delimiter is rewritten first, so a
-backquote pasted out of a MySQL ticket comes back as an apostrophe and a value
-spanning paragraphs comes back on one line. Like the exit phrase, this is a
+backquote pasted out of a MySQL ticket comes back as an apostrophe, and a value
+spanning paragraphs comes back on one line with internal whitespace runs
+squeezed and the edges trimmed. An argument that is empty or all whitespace
+renders as `(not supplied)`, since an empty pair of delimiters is not a
+delimiter pair at all. Like the exit phrase, this is a
 guardrail and not a boundary: it raises the cost of an injected "ignore the
 above", it does not make it impossible.
 
