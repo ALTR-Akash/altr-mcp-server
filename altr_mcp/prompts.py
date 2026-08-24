@@ -56,6 +56,12 @@ def _q(value: str) -> str:
     pair, so two of them pair with *each other* across the prose
     between — framing the prompt's own instructions as caller-supplied
     data the preamble has just disclaimed.
+
+    That placeholder deliberately reads unlike the declared defaults
+    ("<ROLE>", "<DB>.<SCHEMA>.<TABLE>"). Those are templates the caller
+    never filled in and the model should substitute; this is a
+    statement that the caller supplied an empty value, which is a
+    different fact and worth not disguising as the first.
     """
     collapsed = " ".join(value.replace("`", "'").split())
     return "`" + (collapsed or "(not supplied)") + "`"

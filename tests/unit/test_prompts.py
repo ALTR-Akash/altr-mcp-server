@@ -47,7 +47,20 @@ def test_a_timestamp_keeps_its_single_space():
     assert _q("2026-08-24 14:03:00") == "`2026-08-24 14:03:00`"
 
 
-def test_no_output_ever_contains_a_backquote_run():
-    """The property the integration test's span model depends on."""
-    for value in ("", "  ", "``", "a``b", "`", "a\n\nb", "x" * 200):
-        assert "``" not in _q(value), value
+def test_output_is_always_exactly_one_well_formed_span():
+    """The invariant the integration test's span model depends on.
+
+    Four clauses, because each escape shape that shipped violated a
+    different one: an interior backquote closed the fence early, a
+    surviving newline unpaired it, and a value collapsing to nothing
+    left an empty span that paired with the next one instead. Asserted
+    over a fuzz list rather than per shape -- checking the shapes
+    already known to be handled is what let each successor through.
+    """
+    for value in ("", "  ", "``", "a``b", "`", "a\n\nb", "a\u2028b",
+                  "  x  y  ", "\x85\x0b\x0c", "`" * 50, "x" * 200):
+        out = _q(value)
+        assert out.startswith("`") and out.endswith("`"), value
+        assert out.count("`") == 2, value      # no interior delimiter
+        assert "\n" not in out, value          # the span stays inline
+        assert len(out) > 2, value             # not an empty span

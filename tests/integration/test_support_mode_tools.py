@@ -348,6 +348,14 @@ async def test_prompt_arguments_are_framed_as_data_not_instructions(
         "a backquote run longer than one reached the rendered prompt,"
         " so spans no longer pair the way this test assumes"
     )
+    # The other half of the same condition. The regex pairs greedily
+    # left to right, so an UNPAIRED backquote shifts every later pairing
+    # by one and the subtraction starts deleting prose instead of spans.
+    # CommonMark would leave that one literal.
+    assert text.count("`") % 2 == 0, (
+        "an unpaired backquote reached the rendered prompt, so the"
+        " subtraction below no longer pairs spans the way CommonMark does"
+    )
 
     # A value the fence really covers holds no backquote and no newline,
     # so it matches here and drops out. Deliberately not reconstructed
@@ -356,23 +364,22 @@ async def test_prompt_arguments_are_framed_as_data_not_instructions(
     # payload that did not happen to split them.
     outside = re.sub(r"`[^`\n]*`", "", text)
 
-    # The property, not one phrase standing in for it: the argument adds
-    # no occurrence of any of its own words to the prose outside the
-    # spans. Compared against a benign render rather than asserted
-    # absent outright, because the payload's words ("call",
-    # "instructions") legitimately occur in the server-authored preamble
-    # -- and asserting one hard-coded phrase instead would pass an
-    # implementation that leaks only the head or only the tail.
+    # Both directions at once, and exactly. The two renders differ only
+    # in the column span, so with every span subtracted they must be
+    # identical. Counting the payload's own words instead is
+    # one-directional -- it cannot see server prose being pulled INTO a
+    # disclaimed span, which is the shape that shipped last round -- and
+    # it degrades to asserting nothing for a payload whose words are all
+    # short, which the empty and whitespace-only cases below are.
     benign = await _render(
         prompt_mcp, "altr_masking_not_applying", {"column": "ZZBENIGNZZ"}
     )
     baseline = re.sub(r"`[^`\n]*`", "", benign)
-    for fragment in set(injected.split()):
-        if len(fragment) > 3:
-            assert outside.count(fragment) <= baseline.count(fragment), (
-                f"{fragment!r} escaped its delimiter, so it now reads as"
-                " server-authored prose the preamble does not disclaim"
-            )
+    assert outside == baseline, (
+        "the prose outside the delimited spans changed with the"
+        " argument: either the argument escaped its delimiter, or"
+        " server prose was pulled inside one the preamble disclaims"
+    )
 
 
 async def test_every_prompt_delimits_every_argument(prompt_mcp):
