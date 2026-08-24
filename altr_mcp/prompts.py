@@ -34,6 +34,19 @@ _ARM = (
 )
 
 
+def _q(value: str) -> str:
+    """Delimit a caller-supplied value so it cannot close its own quoting.
+
+    A literal backquote in a value would end the fence and let the rest
+    of it render as server-authored prose — precisely what the preamble
+    prevents by scoping its disclaimer to the backquoted span. Swapped
+    for an apostrophe rather than escaped: this is prose for a model,
+    not a data channel, and a name carrying a backquote is far likelier
+    to be pasted ticket noise than a real identifier.
+    """
+    return "`" + value.replace("`", "'") + "`"
+
+
 def register(mcp: FastMCP) -> None:
 
     @mcp.prompt(
@@ -49,11 +62,11 @@ def register(mcp: FastMCP) -> None:
     ) -> str:
         return (
             f"{_ARM}"
-            f"My Snowflake column `{column}` is still returning raw values"
-            f" for role `{role}`, but I expected it to be masked. Check:"
+            f"My Snowflake column {_q(column)} is still returning raw values"
+            f" for role {_q(role)}, but I expected it to be masked. Check:"
             " which tags are connected, whether any tag covers this"
             " column, which masking policies exist and their rules, what"
-            f" masking level applies to `{role}`, and whether that role is"
+            f" masking level applies to {_q(role)}, and whether that role is"
             " even known to ALTR. Tell me the specific reason it is not"
             " masking, and list what is missing."
         )
@@ -72,8 +85,8 @@ def register(mcp: FastMCP) -> None:
     ) -> str:
         return (
             f"{_ARM}"
-            f"Queries against `{table}` are returning NULL or an error"
-            f" where I expected masked values, for role `{role}`. Check the"
+            f"Queries against {_q(table)} are returning NULL or an error"
+            f" where I expected masked values, for role {_q(role)}. Check the"
             " policies and rules that apply, and specifically look for a"
             " masking level that does not fit the column's data type."
             " Report the policy, the rule, the masking level, and whether"
@@ -93,8 +106,8 @@ def register(mcp: FastMCP) -> None:
     ) -> str:
         return (
             f"{_ARM}"
-            f"I started an ALTR classification job on `{database}` around"
-            f" `{started}`. List my recent jobs with status and timestamps,"
+            f"I started an ALTR classification job on {_q(database)} around"
+            f" {_q(started)}. List my recent jobs with status and timestamps,"
             " and tell me whether it is still running, completed, or"
             " failed. Do not start a new job, even if I ask, without"
             " telling me first that the existing one is still running."
@@ -116,9 +129,9 @@ def register(mcp: FastMCP) -> None:
     ) -> str:
         return (
             f"{_ARM}"
-            f"My classification job `{job_id}` on `{database}` finished, but"
+            f"My classification job {_q(job_id)} on {_q(database)} finished, but"
             " the results look wrong. Pull the job summary and walk the"
-            f" findings down to the column level for `{table}`. Tell me"
+            f" findings down to the column level for {_q(table)}. Tell me"
             " which classifiers fired, which columns were flagged, and"
             " which findings are still pending review versus approved or"
             " rejected. Do not approve, reject, or change any finding."
@@ -134,7 +147,7 @@ def register(mcp: FastMCP) -> None:
     def sidecar_not_connecting(sidecar: str = "<SIDECAR_NAME>") -> str:
         return (
             f"{_ARM}"
-            f"My ALTR sidecar `{sidecar}` is not showing as connected."
+            f"My ALTR sidecar {_q(sidecar)} is not showing as connected."
             " Report: the sidecar's configuration, its registered"
             " listeners, its instances and their last-seen status, and"
             " the repos and bindings attached to it. Then tell me which"
@@ -155,10 +168,10 @@ def register(mcp: FastMCP) -> None:
     ) -> str:
         return (
             f"{_ARM}"
-            f"I cannot connect to repo `{repo}` through the sidecar as user"
-            f" `{db_user}`. Check the repo config, the repo users defined in"
+            f"I cannot connect to repo {_q(repo)} through the sidecar as user"
+            f" {_q(db_user)}. Check the repo config, the repo users defined in"
             " ALTR, the sidecar bindings, and any impersonation policies"
-            f" that should let `{my_email}` impersonate `{db_user}`. Report"
+            f" that should let {_q(my_email)} impersonate {_q(db_user)}. Report"
             " exactly which link in that chain is missing. Also flag any"
             " mismatch between the repo name in the connection string and"
             " the repo name registered in ALTR, including hyphens versus"
@@ -175,7 +188,7 @@ def register(mcp: FastMCP) -> None:
     def cannot_disconnect_resource(resource: str = "<RESOURCE>") -> str:
         return (
             f"{_ARM}"
-            f"ALTR will not let me disconnect `{resource}`. Enumerate"
+            f"ALTR will not let me disconnect {_q(resource)}. Enumerate"
             " everything still attached to it, in teardown order:"
             " bindings, then users, then listeners, then the sidecar,"
             " then the repo. For a Snowflake database, also check"
@@ -205,8 +218,8 @@ def register(mcp: FastMCP) -> None:
     ) -> str:
         return (
             f"{_ARM}"
-            f"I need to know who queried `{table}` between `{start}` and"
-            f" `{end}`, and what masking they received. Search the query"
+            f"I need to know who queried {_q(table)} between {_q(start)} and"
+            f" {_q(end)}, and what masking they received. Search the query"
             " audits and summarize by user and role. Report the masking"
             " level applied, not the underlying values. Quote only the"
             " query text you need, since audit query text routinely"

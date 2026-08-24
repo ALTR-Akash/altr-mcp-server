@@ -205,8 +205,9 @@ This is an operator-level safety net — it prevents accidental or unwanted tool
 
 Set `SUPPORT_MODE=true` to expose only the 71 lookup tools and withhold the other 85 —
 everything that changes state, plus the four detokenization tools, which change nothing but
-return real customer values. Intended for support and field engineering investigations, where the job is to read
-configuration and audit history and an accidental write would be a production incident.
+return real customer values. Intended for support and field engineering investigations,
+where the job is to read configuration and audit history and an accidental write would be a
+production incident.
 
 On stdio `tools/list` reports 72, the 71 lookups plus an inert `enter_support_mode`, so that a
 prompt opening with that call still reads correctly. On the HTTP transports it reports 71.

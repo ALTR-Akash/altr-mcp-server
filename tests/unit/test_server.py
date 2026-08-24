@@ -48,7 +48,8 @@ def _isolated_mcp(monkeypatch):
     # Built like the real module-level server, both arguments included.
     # main() only reassigns instructions when it has something to append,
     # so a bare FastMCP would leave them None; omitting version= would
-    # report fastmcp's own, which is the bug server.py:26 records.
+    # report fastmcp's own, the bug
+    # test_server_info_version_is_ours_not_fastmcps guards.
     monkeypatch.setattr(
         server,
         "mcp",

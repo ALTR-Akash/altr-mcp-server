@@ -216,6 +216,14 @@ unavailable in support mode until it is added to `SUPPORT_ALLOWED_TOOLS` on
 purpose. A deny-list of the 85 withheld tools would expose anything new by
 default, which is the wrong failure direction for a safety feature.
 
+**Prompt arguments are framed as data, not instructions.** Every argument is
+interpolated after the guardrail preamble, so text inside one is the most
+recent thing the model read. The arguments are table names, roles, job IDs and
+emails, pasted out of customer tickets, so each is delimited and the preamble
+disclaims the delimited spans as data. Like the exit phrase, this is a
+guardrail and not a boundary: it raises the cost of an injected "ignore the
+above", it does not make it impossible.
+
 **The allow-list is tested against the live registry.**
 `tests/unit/test_support_mode.py` fails if a listed tool is no longer
 registered, if an allowed tool is neither `readOnlyHint` nor one of the three
