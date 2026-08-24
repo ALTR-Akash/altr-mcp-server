@@ -58,7 +58,11 @@ def test_output_is_always_exactly_one_well_formed_span():
     already known to be handled is what let each successor through.
     """
     for value in ("", "  ", "``", "a``b", "`", "a\n\nb", "a\u2028b",
-                  "  x  y  ", "\x85\x0b\x0c", "`" * 50, "x" * 200):
+                  "  x  y  ", "\x85\x0b\x0c", "`" * 50, "x" * 200,
+                  # Shaped like the declared defaults, which _q()'s
+                  # docstring reasons about and so invites a carve-out
+                  # for. Nothing else in this list enters such a branch.
+                  "<ROLE>", "<a\n\nb>"):
         out = _q(value)
         assert out.startswith("`") and out.endswith("`"), value
         assert out.count("`") == 2, value      # no interior delimiter
@@ -76,5 +80,12 @@ def test_a_long_value_survives_intact():
     longer than that, and a fidelity regression would reach a customer
     as a wrong-looking identifier with nothing objecting.
     """
-    fqn = "PROD_ANALYTICS.PUBLIC.CUSTOMER_ACCOUNTS.SOCIAL_SECURITY_NUMBER"
-    assert _q(fqn) == "`" + fqn + "`"
+    for value in (
+        "PROD_ANALYTICS.PUBLIC.CUSTOMER_ACCOUNTS.SOCIAL_SECURITY_NUMBER",
+        "sidecar-prod-01.us-east-1.internal.customer-corp.com",
+        # my_email is a real argument, so an address losing its "@"
+        # reaches the model as a wrong-looking identifier. Equality pins
+        # fidelity only for characters the value actually contains.
+        "first.last+altr@customer-corp.com",
+    ):
+        assert _q(value) == "`" + value + "`", value
