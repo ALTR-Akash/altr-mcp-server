@@ -1,11 +1,19 @@
 """Server middleware.
 
 ToolRestrictionMiddleware hides and blocks tools listed in
-RESTRICTED_TOOLS. ValidationRedactionMiddleware keeps rejected argument
-values out of the error returned to the caller.
+RESTRICTED_TOOLS and, when an allow-list is in force, every tool absent
+from it. ValidationRedactionMiddleware keeps rejected argument values out
+of the error returned to the caller.
+
+The allow-list can be static (passed in at construction, which is what
+the SUPPORT_MODE env var does) or live (read from a
+SupportModeController, which is what the enter_support_mode tool does).
+Enforcement is the same code either way. That matters: the runtime path
+is not a softer kind of check, it is the same check reading a value that
+can change.
 """
 
-from typing import Optional
+from typing import Iterable, Optional
 
 import structlog
 from fastmcp.exceptions import ToolError
@@ -15,17 +23,40 @@ from pydantic import ValidationError
 
 from altr_mcp.utils.logging import _validation_message
 
+from altr_mcp.modes import parse_tool_list
+from altr_mcp.support_control import SupportModeController
+
 logger = structlog.get_logger(__name__)
 
 
 class ToolRestrictionMiddleware(Middleware):
-    """Hide restricted tools from tools/list and block them on tools/call."""
+    """Hide restricted tools from tools/list and block them on tools/call.
 
-    def __init__(self, restricted_tools: Optional[str] = None) -> None:
-        raw = restricted_tools or ""
-        self.restricted_tools: set[str] = {
-            t.strip() for t in raw.split(",") if t.strip()
-        }
+    Filters, all applied:
+
+    * ``restricted_tools`` is a deny-list from RESTRICTED_TOOLS. Named
+      tools are withheld; everything else passes. This is the operator's
+      list, so it wins over everything below it, including a granted
+      unlock.
+    * ``allowed_tools`` is an optional static allow-list. When supplied,
+      only the named tools pass. This fails closed: a tool added in a
+      future release is withheld until it is added to the allow-list on
+      purpose.
+    * ``controller``, when supplied, provides the allow-list live and
+      may hold a one-shot unlock for a single named write.
+    """
+
+    def __init__(
+        self,
+        restricted_tools: Optional[str] = None,
+        allowed_tools: Optional[Iterable[str]] = None,
+        controller: Optional[SupportModeController] = None,
+    ) -> None:
+        self.restricted_tools: set[str] = parse_tool_list(restricted_tools)
+        self.allowed_tools: Optional[set[str]] = (
+            set(allowed_tools) if allowed_tools is not None else None
+        )
+        self.controller = controller
         self._checked_names = False
         if self.restricted_tools:
             logger.info(
@@ -33,18 +64,70 @@ class ToolRestrictionMiddleware(Middleware):
                 restricted_count=len(self.restricted_tools),
                 restricted_tools=sorted(self.restricted_tools),
             )
+        if self.allowed_tools is not None:
+            logger.info(
+                "tool_restriction_middleware.allow_list_active",
+                allowed_count=len(self.allowed_tools),
+            )
+
+    def _effective_allow_list(self) -> Optional[set[str]]:
+        """The allow-list in force right now.
+
+        A static list and a controller can both be present; the
+        intersection applies, so neither can widen the other.
+        """
+        static = self.allowed_tools
+        live = (
+            self.controller.allowed_tools()
+            if self.controller is not None
+            else None
+        )
+        if static is None:
+            return set(live) if live is not None else None
+        if live is None:
+            return static
+        return static & set(live)
+
+    def _withheld_reason(self, tool_name: str) -> Optional[str]:
+        """Return why a tool is unavailable, or None if it is available.
+
+        Pure: safe to call from on_list_tools without spending an
+        unlock.
+        """
+        if tool_name in self.restricted_tools:
+            return "access restrictions"
+        allow = self._effective_allow_list()
+        if allow is not None and tool_name not in allow:
+            return "support read-only mode"
+        return None
 
     async def on_call_tool(self, context: MiddlewareContext, call_next):
         tool_name = context.message.name
-        if tool_name in self.restricted_tools:
+        # No await from here down to consume_unlock() below. Requests are
+        # dispatched concurrently (tg.start_soon in the low-level server),
+        # and _withheld_reason() is what admits the call by reading
+        # pending_unlock, so any yield point between that read and the
+        # consume lets two parallel calls pass on one authorization.
+        # test_two_concurrent_calls_spend_one_unlock_exactly_once covers it.
+        reason = self._withheld_reason(tool_name)
+        if reason is not None:
             logger.warning(
                 "tool_restriction_middleware.blocked",
                 tool=tool_name,
+                reason=reason,
             )
             raise ToolError(
                 f"Tool '{tool_name}' is not available"
-                " due to access restrictions"
+                f" due to {reason}"
             )
+        # Available only because an unlock was granted for it: spend the
+        # unlock now, so the next call to the same tool is blocked again.
+        # See the no-await note above.
+        if (
+            self.controller is not None
+            and self.controller.pending_unlock == tool_name
+        ):
+            self.controller.consume_unlock(tool_name)
         return await call_next(context)
 
     def _check_names_once(self, registered: set[str]) -> None:
@@ -78,12 +161,15 @@ class ToolRestrictionMiddleware(Middleware):
 
     async def on_list_tools(self, context: MiddlewareContext, call_next):
         all_tools = await call_next(context)
-        if not self.restricted_tools:
+        if (
+            not self.restricted_tools
+            and self._effective_allow_list() is None
+        ):
             return all_tools
         self._check_names_once({t.name for t in all_tools})
         filtered = [
             t for t in all_tools
-            if t.name not in self.restricted_tools
+            if self._withheld_reason(t.name) is None
         ]
         logger.debug(
             "tool_restriction_middleware.filtered",

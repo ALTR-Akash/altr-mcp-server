@@ -18,6 +18,7 @@ def register_all(mcp: FastMCP) -> None:
         key_management,
         policy,
         sidecar_config,
+        support_mode,
         tag,
         telemetry,
         vault_tokenization,
@@ -37,3 +38,4 @@ def register_all(mcp: FastMCP) -> None:
     vault_tokenization.register(mcp)
     critical_tokenization.register(mcp)
     key_management.register(mcp)
+    support_mode.register(mcp)

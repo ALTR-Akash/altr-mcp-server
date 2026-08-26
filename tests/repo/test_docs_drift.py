@@ -32,6 +32,16 @@ from altr_mcp.tools import register_all
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DOCS_DIR = REPO_ROOT / "docs"
 
+# Tool modules that are deliberately not domains. ``support_mode`` holds the
+# three mode-control tools (``enter_support_mode``, ``request_write_unlock``,
+# ``exit_support_mode``); they change what the rest of the server will do
+# rather than manage anything on the ALTR platform, so they belong in
+# docs/support-mode.md under Reference, not as a fourteenth domain in the
+# README table, the index bullets, and the domain list inside
+# altr_mcp/instructions.md. Adding a module here is a claim that it is not a
+# domain, not a way to skip documenting it.
+NON_DOMAIN_MODULES = frozenset({"support_mode"})
+
 # One row per tool module: (display name, domain doc, module name).
 # Display names must match both the README table and the docs/index.md
 # bullet list; the module name must match a file in altr_mcp/tools/.
@@ -65,9 +75,11 @@ DOC_SOURCES = (
 # A snake_case identifier: two or more lowercase segments.
 SNAKE_CASE = re.compile(r"\b([a-z][a-z0-9]*(?:_[a-z0-9]+)+)\b")
 
-# API field names that look tool-shaped but are neither tools nor tool
-# parameters. list_value is a DAM Alerting filter-tree field.
-NOT_TOOLS = frozenset({"list_value"})
+# Identifiers that look tool-shaped but are neither tools nor tool
+# parameters. list_value is a DAM Alerting filter-tree field, and
+# list_changed is the tail of the MCP notifications/tools/list_changed
+# notification.
+NOT_TOOLS = frozenset({"list_value", "list_changed"})
 
 # A trailing "(N tools)" on a heading or a list item.
 COUNT_SUFFIX = re.compile(r"\((\d+) tools\)")
@@ -128,7 +140,7 @@ def test_domain_table_covers_every_tool_module():
     """
     on_disk = {
         p.stem for p in (REPO_ROOT / "altr_mcp" / "tools").glob("*.py")
-        if p.stem != "__init__"
+        if p.stem != "__init__" and p.stem not in NON_DOMAIN_MODULES
     }
     declared = {module_name for _, _, module_name in DOMAINS}
     assert declared == on_disk, (

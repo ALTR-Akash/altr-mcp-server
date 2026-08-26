@@ -24,6 +24,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `docs/dam-alerting.md`.
 - `ALTR_DAM_ALERTING_BASE_URL` overrides the DAM Alerting endpoint, which
   defaults to `https://<ORG_ID>.dam-alerting.live.altr.com/v1/dam-alerting`.
+- `SUPPORT_MODE` — a read-only mode for support and field engineering
+  investigations. When enabled, only the 71 lookup tools are exposed, plus an
+  inert `enter_support_mode` on stdio; the 85 tools that create, update,
+  delete, disconnect, register, deregister, trigger, approve, deny, restore,
+  revoke, rotate, import, or tokenize are removed from `tools/list` and
+  rejected on `tools/call`. Enabling it also appends
+  `altr_mcp/instructions_support.md` to the server instructions sent to the
+  client. Composes with `RESTRICTED_TOOLS`; both filters apply. See
+  `docs/support-mode.md`.
+
+  The allow-list is deliberately not derived from `readOnlyHint`. The four
+  detokenization tools carry that annotation and are still withheld, because
+  they return real customer values rather than configuration; the three
+  `search_*` audit tools carry no annotation and are still included, because
+  they POST a search request rather than issuing a GET.
+
+- Runtime support mode, for operators who will not edit a config file. Three
+  tools reach the same enforcement without an env var or a restart:
+  `enter_support_mode` arms the allow-list mid-session,
+  `request_write_unlock` releases exactly one named tool for exactly one call
+  and then re-latches, and `exit_support_mode` restores everything given a
+  confirmation phrase the operator types. Tool visibility changes take effect
+  immediately via a `tools/list_changed` notification. `exit_support_mode`
+  returns a log of every unlock granted and write executed during the session.
+
+  A mode set by the operator through `SUPPORT_MODE` cannot be unlocked or
+  exited by any tool; leaving it still means restarting without the flag. Only
+  a mode the session armed itself can be stood down by the session. The
+  detokenization tools and the two token-delete tools are never unlockable at
+  any scope. These three tools refuse to run on the `sse` and
+  `streamable-http` transports, where one process can serve several clients
+  and a per-process latch would restrict all of them.
+
+- `SUPPORT_PROMPTS` — publishes eight troubleshooting prompts over
+  `prompts/list`, one per common support symptom, each beginning by instructing
+  the client to call `enter_support_mode`. Serving them from the server rather
+  than a wiki page means the guardrail cannot be edited out in transit and the
+  wording versions with the release.
+
+  Off by default. A published prompt appears in every user's prompt menu as
+  soon as they upgrade, which makes publishing one a customer-facing change
+  rather than something that should arrive with a version bump, and it lets a
+  prompt be validated against real cases before anyone outside a pilot can
+  reach it.
+
+  `enter_support_mode` is available under `SUPPORT_MODE` as well, where it is a
+  no-op reporting the mode is already on, so a prompt whose first instruction is
+  to call it reads correctly under both paths. `request_write_unlock` and
+  `exit_support_mode` remain withheld there.
+
+  `SUPPORT_PROMPTS` also appends a short instruction block telling the assistant
+  to arm support mode before troubleshooting, which covers ad-hoc questions and
+  not only the eight prompts. It is gated with the prompts rather than shipped to
+  everyone, because it steers the model to withhold writes and a user who never
+  opted in should not have to be walked through the exit phrase to undo that.
+
+  Both the prompts and that instruction block are published on the `stdio`
+  transport only, since the control tools refuse on `sse` and `streamable-http`
+  and an arming-first prompt would otherwise fail at its first step. Use
+  `SUPPORT_MODE` on those transports.
 
 ### Changed
 - Classifiers are defined through `compound_ruleset` only, and
@@ -34,6 +94,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   top-level pattern, so the ruleset alone decides matches. Include a
   ROW_DATA condition to keep a legacy regex. Classifiers not updated keep
   their existing definition.
+- `ToolRestrictionMiddleware` accepts an optional `allowed_tools` allow-list
+  alongside the existing `restricted_tools` deny-list. Allow-list semantics
+  fail closed: a tool added in a future release is unavailable in support mode
+  until it is added to `SUPPORT_ALLOWED_TOOLS` on purpose. Blocked-tool errors
+  now name which filter withheld the tool.
+- `ToolRestrictionMiddleware` also accepts a `SupportModeController`, which
+  supplies the allow-list live rather than at construction. Where a static
+  allow-list and a controller are both present the intersection applies, so
+  neither can widen the other, and `RESTRICTED_TOOLS` still outranks both. A
+  granted unlock therefore cannot reach a tool the operator denied.
 
 ### Removed
 - The `pattern`, `minimum_threshold` and `sample_size` parameters of

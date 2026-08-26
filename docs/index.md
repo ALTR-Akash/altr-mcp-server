@@ -23,6 +23,8 @@ Tools for managing data security on the ALTR platform.
 
 ## Reference
 
+- [Support Read-Only Mode](support-mode.md) — `SUPPORT_MODE` and the `enter_support_mode` / `request_write_unlock` / `exit_support_mode` tools: expose only the 71 lookup tools (72 on stdio, counting an inert `enter_support_mode`), for support and field engineering investigations
+- [Troubleshooting Prompts](support-mode.md#publishing-the-prompts) — eight symptom-based prompts served over `prompts/list`, each arming support mode as its first step
 - [Error Handling](error-handling.md) — Error types, retry behavior, and response structure
 - [Logging](logging.md) — What is logged at each level, and which arguments are redacted
 - [Releasing](releasing.md) — Tagging a release, what the publish workflow checks, and the `git` prerequisite for builds

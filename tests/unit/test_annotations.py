@@ -175,6 +175,11 @@ NO_ANNOTATION_TOOLS = [
     "critical_tokenize",
     # key_management.py
     "create_tweak", "create_key", "rotate_key",
+    # support_mode.py — these mutate the server's own tool visibility,
+    # never ALTR state. Deliberately unannotated: readOnlyHint would be
+    # a lie about the tool list, and destructiveHint would put them in
+    # the same category as disconnect_database.
+    "enter_support_mode", "request_write_unlock", "exit_support_mode",
 ]
 
 

@@ -50,6 +50,15 @@ class Settings(BaseSettings):
     mcp_port: int = 8000
     # RESTRICTED_TOOLS — comma-separated tool names
     restricted_tools: Optional[str] = None
+    # SUPPORT_MODE — expose only the read-only support tool set and
+    # append the support-mode instructions. See altr_mcp/modes.py.
+    support_mode: bool = False
+    # SUPPORT_PROMPTS — publish the troubleshooting prompts over
+    # prompts/list. Off by default: a prompt appears in every user's
+    # prompt menu as soon as they upgrade, so publishing one is a
+    # customer-facing change and should be opted into rather than
+    # inherited from a version bump. See altr_mcp/prompts.py.
+    support_prompts: bool = False
 
     # URL overrides with production defaults
     altr_api_base_url: str = "https://api.live.altr.com"

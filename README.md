@@ -20,6 +20,8 @@ All tools return structured `{success, data, error}` responses and can run over 
 - [Getting Credentials](#getting-credentials)
 - [Configuration](#configuration)
   - [Restricting Tools](#restricting-tools)
+  - [Support Read-Only Mode](#support-read-only-mode)
+  - [Troubleshooting Prompts](#troubleshooting-prompts)
 - [Setup](#setup)
   - [Claude Desktop](#claude-desktop)
   - [Claude Code (CLI)](#claude-code-cli)
@@ -91,6 +93,8 @@ Set the following environment variables before starting the server:
 | `MCP_HOST` | No | Bind address for HTTP transports (default: `0.0.0.0`) |
 | `MCP_PORT` | No | Port for HTTP transports (default: `8000`) |
 | `RESTRICTED_TOOLS` | No | Comma-separated tool names to hide from clients |
+| `SUPPORT_MODE` | No | Expose only the 71 read-only tools (default: `false`). See [Support Read-Only Mode](#support-read-only-mode) |
+| `SUPPORT_PROMPTS` | No | Publish the troubleshooting prompts over `prompts/list` (default: `false`). See [Troubleshooting Prompts](#troubleshooting-prompts) |
 | `LOG_FORMAT` | No | Log output format: `console` (default) or `json` |
 | `LOG_LEVEL` | No | Log level (default: `INFO`) |
 | `MAX_RETRIES` | No | Attempts per API call before giving up (default: `3`, minimum `1`) |
@@ -196,6 +200,105 @@ Or in the Claude Desktop config:
 ```
 
 This is an operator-level safety net — it prevents accidental or unwanted tool usage but is not a substitute for proper API key permissions.
+
+### Support Read-Only Mode
+
+Set `SUPPORT_MODE=true` to expose only the 71 lookup tools and withhold the 85 that change
+anything. Intended for support and field engineering investigations, where the job is to read
+configuration and audit history and an accidental write would be a production incident.
+
+On stdio `tools/list` reports 72, the 71 lookups plus an inert `enter_support_mode`, so that a
+prompt opening with that call still reads correctly. On the HTTP transports it reports 71.
+
+```json
+{
+  "mcpServers": {
+    "altr": {
+      "command": "uvx",
+      "args": ["altr-mcp"],
+      "env": {
+        "ORG_ID": "your-org-id",
+        "MAPI_KEY": "your-api-key",
+        "MAPI_SECRET": "your-api-secret",
+        "SUPPORT_MODE": "true"
+      }
+    }
+  }
+}
+```
+
+Enabling it also appends a set of operating instructions to the server instructions sent to the
+client, covering what the remaining tools cannot tell you: that this server reads one
+organization only and never the customer's, that an empty result is not proof of absence, and
+that audit query text should be treated as customer data.
+
+Available tools are those whose names begin with `get_`, `list_`, or `search_`, with two
+deliberate exceptions. The four detokenization tools are withheld even though they are annotated
+`readOnlyHint`, because they return real customer values rather than configuration. The three
+`search_*` audit tools are included even though they carry no annotation, because they POST a
+search request rather than issuing a GET and no audit investigation is possible without them.
+
+`SUPPORT_MODE` composes with `RESTRICTED_TOOLS`; both filters apply. It is a guardrail rather
+than a security boundary, since whoever starts the server can also unset it. Note that there is
+no key-scoping control underneath it: an ALTR API key inherits the full permissions of the
+administrator who created it and cannot be scoped to a subset, and only Super Administrators can
+create one. See [docs/support-mode.md](docs/support-mode.md) for the full list and design notes.
+
+#### Without editing any config: `enter_support_mode`
+
+The env var above requires editing a client config and restarting. The operators most in need of
+a guardrail are the least likely to do that correctly, so the same enforcement can be armed from
+inside a session:
+
+| Tool | Effect |
+| --- | --- |
+| `enter_support_mode` | Arms the allow-list for the rest of the session. No restart, no config change. |
+| `request_write_unlock` | Releases exactly one named tool for exactly one call, with a recorded reason, then re-latches. |
+| `exit_support_mode` | Restores every tool, given a confirmation phrase the operator types. Returns a log of what changed while the mode was on. |
+
+Tool visibility updates immediately through a `tools/list_changed` notification, so withheld
+tools disappear from the client rather than failing when called.
+
+The two paths are deliberately not equally reversible. A mode the operator set through
+`SUPPORT_MODE` cannot be unlocked or exited by any tool, and `exit_support_mode` and
+`request_write_unlock` are withheld entirely in that mode: a decision made in configuration
+should not be reversible by the model it was meant to constrain. Only a mode the session armed
+itself can be stood down by the session.
+
+Two limits worth stating plainly. Arming is model-dependent, since something has to call
+`enter_support_mode`; once armed, enforcement is identical to the env var, because it is the same
+middleware. And the detokenization tools and the two token-delete tools are never unlockable at
+any scope, so no unlock, however narrow, returns plaintext.
+
+These tools refuse to run on the `sse` and `streamable-http` transports, where one process can
+serve several clients and a per-process latch would restrict all of them. Use `SUPPORT_MODE`
+there.
+
+### Troubleshooting Prompts
+
+Set `SUPPORT_PROMPTS=true` to publish eight prompts over `prompts/list`, one per common support
+symptom, which then appear in the client's prompt menu:
+
+`altr_masking_not_applying`, `altr_masking_returns_null`,
+`altr_classification_job_stuck`, `altr_classification_results_wrong`,
+`altr_sidecar_not_connecting`, `altr_sidecar_impersonation_failing`,
+`altr_cannot_disconnect_resource`, `altr_who_accessed_data`
+
+They are off by default. A published prompt shows up in every user's prompt menu the moment they
+upgrade, so publishing one is a customer-facing change and should be a deliberate decision rather
+than something inherited from a version bump.
+
+Setting `SUPPORT_PROMPTS` also appends a short instruction block telling the assistant to arm
+support mode before troubleshooting, which covers your own ad-hoc questions and not just these
+eight prompts. It is gated with the prompts rather than shipped to everyone, since it steers the
+model to withhold writes. Both are published on `stdio` only, because the control tools refuse on
+`sse` and `streamable-http`; use `SUPPORT_MODE` there.
+
+Each one begins by instructing the client to call `enter_support_mode`, so picking a prompt is
+what arms the guardrail. That call stays available even under `SUPPORT_MODE`, where it is a no-op
+reporting the mode is already on, so the prompts read correctly under both paths. Serving them
+from the server rather than pasting them from a wiki page means the guardrail line cannot be
+dropped in transit and the wording versions with the release.
 
 ## Setup
 
