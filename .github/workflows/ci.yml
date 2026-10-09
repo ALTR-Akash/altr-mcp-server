@@ -28,7 +28,7 @@ jobs:
       - uses: astral-sh/setup-uv@v7
         with:
           python-version: "3.11"
-      - run: uv run --with flake8 flake8 altr_mcp/ tests/ scripts/
+      - run: uv run --with flake8 flake8 altr_mcp/ tests/ scripts/ .github/scripts/
 
   test:
     name: test (python ${{ matrix.python-version }})
@@ -68,7 +68,22 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: uv venv && uv pip install -e ".[dev]"
-      - run: .venv/bin/python -m pytest tests/ -x
+      - run: .venv/bin/python -m pytest tests/ -rfE | tee pytest.log
+        shell: bash
+      - name: Summarize what the newest versions broke
+        if: failure() && github.event_name == 'schedule'
+        shell: bash
+        run: |
+          uv export --frozen --no-hashes --extra dev > lock-pins.txt
+          uv pip freeze > installed.txt
+          { echo "### Python ${{ matrix.python-version }}"; echo
+            python3 .github/scripts/summarize_findings.py newest pytest.log lock-pins.txt installed.txt
+          } > findings.md
+      - if: failure() && github.event_name == 'schedule'
+        uses: actions/upload-artifact@v4
+        with:
+          name: findings-newest-py${{ matrix.python-version }}
+          path: findings.md
 
   test-redaction:
     # fastmcp reports a rejected argument three ways across the allowed range.
@@ -88,3 +103,33 @@ jobs:
           python-version: "3.12"
       - run: uv venv && uv pip install -e ".[dev]" "fastmcp==${{ matrix.fastmcp }}"
       - run: .venv/bin/python -m pytest tests/unit/test_logging.py tests/unit/test_middleware.py
+
+  report-failure:
+    # A scheduled run has no pull request to show its result, so a finding
+    # opens an issue assigned to the maintainers.
+    needs: [test-newest]
+    # A job that times out ends as cancelled, not failed, so check both.
+    if: >-
+      always() && github.event_name == 'schedule' &&
+      (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - uses: actions/download-artifact@v4
+        continue-on-error: true  # nothing to download if the check never finished
+        with:
+          pattern: findings-*
+          path: findings
+      - run: .github/scripts/report-scheduled-failure.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHECK_NAME: Weekly dependency check
+          FINDINGS_DIR: findings
+          ISSUE_ASSIGNEES: altr-andrea,altrparker
