@@ -26,7 +26,8 @@ def test_dependabot_updates_python_and_actions_weekly():
 
 def test_published_lower_bounds_are_never_raised():
     """Raising a lower bound in pyproject.toml narrows what users can install."""
-    assert _updates()["uv"]["versioning-strategy"] == "widen"
+    # increase-if-necessary leaves a satisfied bound alone; increase raises it.
+    assert _updates()["uv"]["versioning-strategy"] == "increase-if-necessary"
 
 
 def test_updates_are_grouped_and_titled_as_conventional_commits():
