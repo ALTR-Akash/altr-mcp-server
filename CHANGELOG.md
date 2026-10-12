@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Review-gated classification jobs. `create_job`, `create_gdlp_job`,
+  `create_databricks_job` and `create_oltp_job` accept `requires_review`,
+  which holds the report until every finding is decided. Two new tools
+  finish the review: `confirm_job_report` releases the report and
+  `cancel_job_report` abandons it.
+- `record_bulk_job_decision` approves or rejects every undecided finding
+  matching a filter of classifiers, confidence tiers and a database path,
+  with a `dry_run` option that returns the counts first.
+  `revoke_bulk_job_decision` undoes one.
+- `get_job_findings_leaves` lists every finding in a job in one paginated
+  stream, optionally filtered by confidence tier.
+
 ## [0.7.1]
 
 ### Security

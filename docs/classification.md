@@ -1,4 +1,4 @@
-# Classification Tools (36 tools)
+# Classification Tools (41 tools)
 
 Discover sensitive data in your databases using automated classification. Manage classifiers (pattern-based detectors), group them into collections, and run classification jobs that scan columns for PII, financial data, and other sensitive patterns. Supports Snowflake, OLTP, and Databricks (GDLP only).
 
@@ -37,10 +37,15 @@ Discover sensitive data in your databases using automated classification. Manage
 | `get_job_findings_columns` | List detected columns in a table |
 | `get_job_findings_classifiers` | List classifiers that fired on a column |
 | `get_job_findings_lineage` | Get compound-ruleset evaluation trace for a classifier on a column |
+| `get_job_findings_leaves` | List every finding in a job in one paginated stream |
 | `record_job_decision` | Approve or reject classification findings |
 | `get_job_decisions` | List review decisions recorded for a job |
 | `revoke_job_decisions` | Remove previously recorded decisions |
+| `record_bulk_job_decision` | Approve or reject every undecided finding matching a filter |
+| `revoke_bulk_job_decision` | Undo a bulk decision |
 | `get_job_review_status` | Get approved/rejected/pending counts for a job |
+| `confirm_job_report` | Confirm a review-gated job's decisions and release its report |
+| `cancel_job_report` | Cancel a review-gated job before its report is confirmed |
 | `get_classification_report` | Download full results from a completed job |
 
 ## Typical Workflow
@@ -71,6 +76,18 @@ Discover sensitive data in your databases using automated classification. Manage
 5. When COMPLETED, view results with `get_job_findings` or `get_classification_report`
 
 For Snowflake GDLP (Google DLP) scans, use `create_gdlp_job` instead of `create_job`.
+
+### Review-gated jobs
+
+Every job-creation tool accepts `requires_review`. When it is true, the job holds its report for human review:
+
+1. Create the job with `requires_review=true`
+2. When the job reaches AWAITING_REVIEW, browse findings with `get_job_findings` or `get_job_findings_leaves`
+3. Decide findings with `record_job_decision`, or many at once with `record_bulk_job_decision` (run it with `dry_run=true` first to see the counts)
+4. Check that nothing is pending with `get_job_review_status`
+5. Release the report with `confirm_job_report`; decisions are then locked. Poll `get_job` until COMPLETED, then use `get_classification_report`
+
+To abandon a review instead, call `cancel_job_report`.
 
 ## Condition Types
 
@@ -365,6 +382,7 @@ Run an ALTR-native classification scan on a Snowflake database. Jobs run asynchr
 | `database_id` | int | yes | Target database ID (from `get_databases` / `get_database_id`) |
 | `collection_name` | str | yes | Classifier collection to use for this run |
 | `condition_types` | list[str] | no | Additional condition targets to enable (see [Condition Types](#condition-types)) |
+| `requires_review` | bool | no | Hold the report for human review until `confirm_job_report` runs (see [Review-gated jobs](#review-gated-jobs)) |
 
 ---
 
@@ -379,6 +397,7 @@ Run a GDLP (Google DLP) classification scan on a Snowflake connection. Posts to 
 | `condition_types` | list[str] | no | Additional condition targets to enable |
 | `sample_size` | int | no | Rows to sample per column (server defaults to 100) |
 | `sample_type` | str | no | Sampling unit (server defaults to `ROWS`) |
+| `requires_review` | bool | no | Hold the report for human review until `confirm_job_report` runs (see [Review-gated jobs](#review-gated-jobs)) |
 
 ---
 
@@ -391,6 +410,7 @@ Run a GDLP classification scan on a Databricks connection. Scans all accessible 
 | `database_id` | int | yes | ALTR database ID for the Databricks connection |
 | `collection_name` | str | no | Any ALTR collection whose classifiers scope this scan (not limited to GDLP collections) — every classifier in it is evaluated, subject to `condition_types`. When omitted, all default Google DLP infoTypes are used |
 | `condition_types` | list[str] | no | Condition targets to evaluate (server defaults to `["GDLP", "METADATA", "COLUMN_LOCATION", "CONTENT_TYPE"]`) |
+| `requires_review` | bool | no | Hold the report for human review until `confirm_job_report` runs (see [Review-gated jobs](#review-gated-jobs)) |
 
 ---
 
@@ -412,6 +432,7 @@ Run an on-demand classification scan on an OLTP database (Oracle, MSSQL, MySQL, 
 | `sid` | str | no | Oracle SID (Oracle repos only) |
 | `service_name` | str | no | Oracle service name or alternate connection identifier |
 | `task_id` | str | no | Link this on-demand run to an existing scheduled task UUID |
+| `requires_review` | bool | no | Hold the report for human review until `confirm_job_report` runs (see [Review-gated jobs](#review-gated-jobs)) |
 
 ---
 
@@ -432,7 +453,7 @@ Entry point for navigating classification results hierarchically. Returns databa
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `job_id` | str | yes | COMPLETED job identifier |
+| `job_id` | str | yes | Identifier of a COMPLETED job, or of a review-gated job at AWAITING_REVIEW |
 | `limit` | int | no | Max databases to return |
 | `page_token` | str | no | Pagination token |
 | `classifier_name` | str or list[str] | no | Filter to databases with detections by these classifier(s) |
@@ -447,7 +468,7 @@ List schemas with detected columns in a database. Second level of the findings t
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `job_id` | str | yes | COMPLETED job identifier |
+| `job_id` | str | yes | Identifier of a COMPLETED job, or of a review-gated job at AWAITING_REVIEW |
 | `database` | str | yes | Database name from `get_job_findings` |
 | `limit` | int | no | Max schemas to return |
 | `page_token` | str | no | Pagination token |
@@ -462,7 +483,7 @@ List tables with detected columns in a schema. Third level of the findings tree.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `job_id` | str | yes | COMPLETED job identifier |
+| `job_id` | str | yes | Identifier of a COMPLETED job, or of a review-gated job at AWAITING_REVIEW |
 | `database` | str | yes | Database name |
 | `schema` | str | yes | Schema name from `get_job_findings_schemas` |
 | `limit` | int | no | Max tables to return |
@@ -478,7 +499,7 @@ List detected columns in a table. Fourth level of the findings tree.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `job_id` | str | yes | COMPLETED job identifier |
+| `job_id` | str | yes | Identifier of a COMPLETED job, or of a review-gated job at AWAITING_REVIEW |
 | `database` | str | yes | Database name |
 | `schema` | str | yes | Schema name |
 | `table` | str | yes | Table name from `get_job_findings_tables` |
@@ -495,7 +516,7 @@ List classifiers that fired on a specific column. Use `get_job_findings_lineage`
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `job_id` | str | yes | COMPLETED job identifier |
+| `job_id` | str | yes | Identifier of a COMPLETED job, or of a review-gated job at AWAITING_REVIEW |
 | `database` | str | yes | Database name |
 | `schema` | str | yes | Schema name |
 | `table` | str | yes | Table name |
@@ -512,7 +533,7 @@ Get the full compound-ruleset evaluation trace for a classifier on a specific co
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `job_id` | str | yes | COMPLETED job identifier |
+| `job_id` | str | yes | Identifier of a COMPLETED job, or of a review-gated job at AWAITING_REVIEW |
 | `database` | str | yes | Database name |
 | `schema` | str | yes | Schema name |
 | `table` | str | yes | Table name |
@@ -521,13 +542,26 @@ Get the full compound-ruleset evaluation trace for a classifier on a specific co
 
 ---
 
-### record_job_decision
+### get_job_findings_leaves
 
-Approve or reject classification findings in a completed job. Decisions can be scoped from the entire job down to a specific classifier on a specific column. Broader scopes apply to all columns and classifiers within.
+List every finding in a job in one paginated stream, one row per (database, schema, table, column, classifier), ordered by full path. Each row carries the finding count, average match rate, whether it is new, and its resolved review status. Use this to see a whole job at once instead of walking the tree. File sources also return crawl records, with an empty `classifier_name` and no `confirmed_status`; they are not findings and need no decision.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `job_id` | str | yes | COMPLETED job identifier |
+| `job_id` | str | yes | Job identifier |
+| `limit` | int | no | Max rows per page (default 100, max 1000) |
+| `page_token` | str | no | `next_page_token` from a prior call |
+| `confidence` | list[str] | no | Keep only these confidence tiers: `HIGH`, `MEDIUM`, `LOW` |
+
+---
+
+### record_job_decision
+
+Approve or reject classification findings in a job. Decisions can be scoped from the entire job down to a specific classifier on a specific column. Broader scopes apply to all columns and classifiers within.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `job_id` | str | yes | Identifier of a COMPLETED job, or of a review-gated job at AWAITING_REVIEW |
 | `confirmed_status` | str | yes | Decision: `approved` or `rejected` |
 | `database` | str | no | Scope to this database |
 | `schema` | str | no | Scope to this schema (requires `database`) |
@@ -568,13 +602,61 @@ Remove previously recorded review decisions. Revoked findings return to `pending
 
 ---
 
-### get_job_review_status
+### record_bulk_job_decision
 
-Get the review progress for a completed job — total/approved/rejected/pending counts across all findings.
+Approve or reject every undecided finding that matches a filter: the given classifiers, optionally narrowed by confidence tier and by a database, schema and table path. Findings that already have a decision are left alone, and each covered finding can still be overridden with `record_job_decision`. Returns the matched counts, plus a `bulk_decision_id` when something was recorded (not on a dry run or when nothing matched). `classifier_names` must name at least one classifier.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `job_id` | str | yes | COMPLETED job identifier |
+| `job_id` | str | yes | Job identifier |
+| `confirmed_status` | str | yes | Decision: `approved` or `rejected` |
+| `classifier_names` | list[str] | yes | Classifiers whose findings to decide |
+| `confidence` | list[str] | no | Keep only these confidence tiers: `HIGH`, `MEDIUM`, `LOW` |
+| `database` | str | no | Limit to this database |
+| `schema` | str | no | Limit to this schema (requires `database`) |
+| `table` | str | no | Limit to this table (requires `schema`) |
+| `dry_run` | bool | no | Return the counts without recording anything (default false) |
+
+---
+
+### revoke_bulk_job_decision
+
+Undo a bulk decision. Revokes every decision it still covers; a finding decided individually afterwards keeps that individual decision.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `job_id` | str | yes | Job identifier |
+| `bulk_decision_id` | str | yes | `bulk_decision_id` returned by `record_bulk_job_decision` |
+
+---
+
+### get_job_review_status
+
+Get the review progress for a job — total/approved/rejected/pending counts across all findings.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `job_id` | str | yes | Identifier of a COMPLETED job, or of a review-gated job at AWAITING_REVIEW |
+
+---
+
+### confirm_job_report
+
+Confirm the review of a review-gated job (created with `requires_review=true`) and release its report. Every finding must have a decision; check with `get_job_review_status` first. Report generation then runs in the background and decisions are locked. Poll `get_job` until COMPLETED, then read the report with `get_classification_report`.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `job_id` | str | yes | Job identifier |
+
+---
+
+### cancel_job_report
+
+Cancel a review-gated job that is still being reviewed. The job moves to CANCELLED and its review data is discarded. A job whose report has already been confirmed cannot be cancelled this way.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `job_id` | str | yes | Job identifier |
 
 ---
 

@@ -558,7 +558,8 @@ def register(mcp: FastMCP) -> None:
             job_type: str,
             database_id: int,
             collection_name: str,
-            condition_types: list[str] | None = None
+            condition_types: list[str] | None = None,
+            requires_review: bool | None = None
             ) -> dict:
         """Run an ALTR-native classification scan on a Snowflake database.
 
@@ -581,6 +582,9 @@ def register(mcp: FastMCP) -> None:
                 beyond ROW_DATA. Valid values: ROW_DATA, METADATA,
                 COLUMN_LOCATION, CONTENT_TYPE, DATA_LENGTH, COLUMN_SIZE.
                 GDLP and AMAZON_COMPREHEND require separate job types.
+            requires_review: If true, hold the report for human review. The
+                job pauses at AWAITING_REVIEW until every finding is decided
+                and `confirm_job_report` runs. Defaults to false.
         """
         settings = get_settings()
         params = {
@@ -588,6 +592,7 @@ def register(mcp: FastMCP) -> None:
             "database_id": database_id,
             "collection_name": collection_name,
             "condition_types": condition_types,
+            "requires_review": requires_review,
         }
         response = await classification.create_job(
             params, settings.auth)
@@ -600,7 +605,8 @@ def register(mcp: FastMCP) -> None:
             collection_name: str | None = None,
             condition_types: list[str] | None = None,
             sample_size: int | None = None,
-            sample_type: str | None = None
+            sample_type: str | None = None,
+            requires_review: bool | None = None
             ) -> dict:
         """Run a GDLP (Google DLP) classification scan on a Snowflake database.
 
@@ -628,6 +634,9 @@ def register(mcp: FastMCP) -> None:
             sample_size: Optional number of rows to sample per column
                 (defaults to 100 on the server when omitted).
             sample_type: Optional sampling unit (defaults to ROWS).
+            requires_review: If true, hold the report for human review. The
+                job pauses at AWAITING_REVIEW until every finding is decided
+                and `confirm_job_report` runs. Defaults to false.
         """
         settings = get_settings()
         params = {
@@ -636,6 +645,7 @@ def register(mcp: FastMCP) -> None:
             "condition_types": condition_types,
             "sample_size": sample_size,
             "sample_type": sample_type,
+            "requires_review": requires_review,
         }
         response = await classification.create_gdlp_job(params, settings.auth)
         return {"success": True, "data": response, "error": None}
@@ -664,7 +674,8 @@ def register(mcp: FastMCP) -> None:
     async def create_databricks_job(
             database_id: int,
             collection_name: str | None = None,
-            condition_types: list[str] | None = None
+            condition_types: list[str] | None = None,
+            requires_review: bool | None = None
             ) -> dict:
         """Run a GDLP classification scan on a Databricks database.
 
@@ -688,12 +699,16 @@ def register(mcp: FastMCP) -> None:
                 samples by default). Valid values: ROW_DATA, METADATA,
                 COLUMN_LOCATION, GDLP, SNOWFLAKE_NATIVE, CONTENT_TYPE,
                 DATA_LENGTH, COLUMN_SIZE, AMAZON_COMPREHEND.
+            requires_review: If true, hold the report for human review. The
+                job pauses at AWAITING_REVIEW until every finding is decided
+                and `confirm_job_report` runs. Defaults to false.
         """
         settings = get_settings()
         params = {
             "database_id": database_id,
             "collection_name": collection_name,
             "condition_types": condition_types,
+            "requires_review": requires_review,
         }
         response = await classification.create_databricks_job(
             params, settings.auth)
@@ -713,7 +728,8 @@ def register(mcp: FastMCP) -> None:
             condition_types: list[str] | None = None,
             sid: str | None = None,
             service_name: str | None = None,
-            task_id: str | None = None
+            task_id: str | None = None,
+            requires_review: bool | None = None
             ) -> dict:
         """Run an on-demand classification scan on an OLTP database
         (Oracle, MSSQL, MySQL, PostgreSQL) via a sidecar classification agent.
@@ -746,6 +762,9 @@ def register(mcp: FastMCP) -> None:
             sid: Oracle SID (Oracle repos only).
             service_name: Oracle service name or alternate connection identifier.
             task_id: Link this on-demand run to an existing scheduled task UUID.
+            requires_review: If true, hold the report for human review. The
+                job pauses at AWAITING_REVIEW until every finding is decided
+                and `confirm_job_report` runs. Defaults to false.
         """
         settings = get_settings()
         params = {
@@ -761,6 +780,7 @@ def register(mcp: FastMCP) -> None:
             "sid": sid,
             "service_name": service_name,
             "task_id": task_id,
+            "requires_review": requires_review,
         }
         response = await classification.create_oltp_job(
             params, settings.auth)
@@ -789,7 +809,8 @@ def register(mcp: FastMCP) -> None:
         interactively explore or filter results by status or classifier.
 
         Args:
-            job_id: COMPLETED job identifier.
+            job_id: Identifier of a COMPLETED job, or of a review-gated job at
+                AWAITING_REVIEW.
             limit: Max databases to return.
             page_token: Pagination token from a prior call.
             classifier_name: Filter to databases containing detections by
@@ -834,7 +855,8 @@ def register(mcp: FastMCP) -> None:
         to drill into a specific database.
 
         Args:
-            job_id: COMPLETED job identifier.
+            job_id: Identifier of a COMPLETED job, or of a review-gated job at
+                AWAITING_REVIEW.
             database: Database name from `get_job_findings`.
             limit: Max schemas to return.
             page_token: Pagination token.
@@ -874,7 +896,8 @@ def register(mcp: FastMCP) -> None:
         Third level of the findings tree.
 
         Args:
-            job_id: COMPLETED job identifier.
+            job_id: Identifier of a COMPLETED job, or of a review-gated job at
+                AWAITING_REVIEW.
             database: Database name.
             schema: Schema name from `get_job_findings_schemas`.
             limit: Max tables to return.
@@ -916,7 +939,8 @@ def register(mcp: FastMCP) -> None:
         Fourth level of the findings tree.
 
         Args:
-            job_id: COMPLETED job identifier.
+            job_id: Identifier of a COMPLETED job, or of a review-gated job at
+                AWAITING_REVIEW.
             database: Database name.
             schema: Schema name.
             table: Table name from `get_job_findings_tables`.
@@ -961,7 +985,8 @@ def register(mcp: FastMCP) -> None:
         to see the full compound-ruleset evaluation trace for a specific classifier.
 
         Args:
-            job_id: COMPLETED job identifier.
+            job_id: Identifier of a COMPLETED job, or of a review-gated job at
+                AWAITING_REVIEW.
             database: Database name.
             schema: Schema name.
             table: Table name.
@@ -1001,7 +1026,8 @@ def register(mcp: FastMCP) -> None:
         METADATA condition results.
 
         Args:
-            job_id: COMPLETED job identifier.
+            job_id: Identifier of a COMPLETED job, or of a review-gated job at
+                AWAITING_REVIEW.
             database: Database name.
             schema: Schema name.
             table: Table name.
@@ -1012,6 +1038,42 @@ def register(mcp: FastMCP) -> None:
         response = await classification.get_job_findings_lineage(
             job_id, database, schema, table, column,
             classifier_name, settings.auth)
+        return {"success": True, "data": response, "error": None}
+
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
+    @log_tool
+    async def get_job_findings_leaves(
+            job_id: str,
+            limit: int | None = None,
+            page_token: str | None = None,
+            confidence: list[str] | None = None
+            ) -> dict:
+        """List every finding in a job in one stream, ordered by full path.
+
+        One row per (database, schema, table, column, classifier), with
+        total_findings, match_rate_avg, is_new and the resolved review
+        status. Use this to see a whole job at once instead of walking the
+        tree with `get_job_findings` and its drill-down tools. Rows are under
+        `items`. File sources also return crawl records, with an empty
+        classifier_name and no confirmed_status; they are not findings and
+        need no decision, and a confidence filter leaves them out.
+
+        Args:
+            job_id: Job identifier.
+            limit: Max rows per page (default 100, max 1000).
+            page_token: next_page_token from a prior call.
+            confidence: Keep only these confidence tiers: HIGH, MEDIUM, LOW.
+        """
+        settings = get_settings()
+        params: dict = {}
+        if limit is not None:
+            params["limit"] = limit
+        if page_token:
+            params["page_token"] = page_token
+        if confidence:
+            params["confidence"] = confidence
+        response = await classification.get_job_findings_leaves(
+            job_id, params, settings.auth)
         return {"success": True, "data": response, "error": None}
 
     # ── Job decisions ─────────────────────────────────────────────────────────
@@ -1027,17 +1089,20 @@ def register(mcp: FastMCP) -> None:
             column: str | None = None,
             classifier_name: str | None = None
             ) -> dict:
-        """Approve or reject classification findings in a completed job.
+        """Approve or reject classification findings in a job.
 
         Decisions can be scoped from the entire job down to a specific
         classifier on a specific column. Broader scopes (e.g., entire table)
         apply to all columns and classifiers within that scope.
 
         After recording decisions, check overall progress with
-        `get_job_review_status`.
+        `get_job_review_status`. For a job created with requires_review=true,
+        finish with `confirm_job_report` to release the report. To decide
+        many findings at once, use `record_bulk_job_decision`.
 
         Args:
-            job_id: COMPLETED job identifier.
+            job_id: Identifier of a COMPLETED job, or of a review-gated job at
+                AWAITING_REVIEW.
             confirmed_status: Decision to record: "approved" or "rejected".
             database: Scope to this database (omit for job-wide).
             schema: Scope to this schema (requires database).
@@ -1142,17 +1207,93 @@ def register(mcp: FastMCP) -> None:
             job_id, params, settings.auth)
         return {"success": True, "data": response, "error": None}
 
+    @mcp.tool()
+    @log_tool
+    async def record_bulk_job_decision(
+            job_id: str,
+            confirmed_status: str,
+            classifier_names: list[str],
+            confidence: list[str] | None = None,
+            database: str | None = None,
+            schema: str | None = None,
+            table: str | None = None,
+            dry_run: bool = False
+            ) -> dict:
+        """Approve or reject every undecided finding that matches a filter.
+
+        Covers findings of the given classifiers, optionally narrowed by
+        confidence tier and by a database, schema and table path. Findings
+        that already have a decision are left alone, and each covered
+        finding can still be overridden with `record_job_decision`. Run with
+        dry_run=True first to see how many findings it would cover.
+
+        Returns matched_findings and matched_objects, plus a bulk_decision_id
+        when something was recorded (not on a dry run or when nothing
+        matched). Undo the whole decision with `revoke_bulk_job_decision`.
+
+        Args:
+            job_id: Job identifier.
+            confirmed_status: Decision to record: "approved" or "rejected".
+            classifier_names: Classifiers whose findings to decide.
+            confidence: Keep only these confidence tiers: HIGH, MEDIUM, LOW.
+            database: Limit to this database.
+            schema: Limit to this schema (requires database).
+            table: Limit to this table (requires schema).
+            dry_run: If true, return the counts without recording anything.
+        """
+        if not classifier_names:
+            # The engine reads an empty list as every classifier.
+            raise ValueError("classifier_names must name at least one classifier.")
+        settings = get_settings()
+        predicate: dict = {"classifier_names": classifier_names}
+        if confidence:
+            predicate["confidence"] = confidence
+        if database is not None:
+            predicate["database"] = database
+        if schema is not None:
+            predicate["schema"] = schema
+        if table is not None:
+            predicate["table"] = table
+        data = {
+            "confirmed_status": confirmed_status,
+            "predicate": predicate,
+            "dry_run": dry_run,
+        }
+        response = await classification.create_bulk_job_decision(
+            job_id, data, settings.auth)
+        return {"success": True, "data": response, "error": None}
+
+    @mcp.tool(annotations=ToolAnnotations(destructiveHint=True))
+    @log_tool
+    async def revoke_bulk_job_decision(
+            job_id: str, bulk_decision_id: str) -> dict:
+        """Undo a bulk decision recorded with `record_bulk_job_decision`.
+
+        Revokes every decision it still covers. A finding decided
+        individually afterwards keeps that individual decision.
+
+        Args:
+            job_id: Job identifier.
+            bulk_decision_id: bulk_decision_id returned by
+                `record_bulk_job_decision`.
+        """
+        settings = get_settings()
+        response = await classification.delete_bulk_job_decision(
+            job_id, bulk_decision_id, settings.auth)
+        return {"success": True, "data": response, "error": None}
+
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
     @log_tool
     async def get_job_review_status(job_id: str) -> dict:
-        """Get the review progress for a completed classification job.
+        """Get the review progress for a classification job.
 
         Returns total/approved/rejected/pending counts across all findings.
         Use after recording decisions with `record_job_decision` to check
         how much review work remains.
 
         Args:
-            job_id: COMPLETED job identifier.
+            job_id: Identifier of a COMPLETED job, or of a review-gated job at
+                AWAITING_REVIEW.
         """
         settings = get_settings()
         response = await classification.get_job_review_status(
@@ -1160,6 +1301,43 @@ def register(mcp: FastMCP) -> None:
         return {"success": True, "data": response, "error": None}
 
     # ── Report ───────────────────────────────────────────────────────────────
+
+    @mcp.tool()
+    @log_tool
+    async def confirm_job_report(job_id: str) -> dict:
+        """Confirm the review of a review-gated job and release its report.
+
+        For a job created with requires_review=true. Every finding must have
+        a decision; check with `get_job_review_status` first. Generation
+        then runs in the background and decisions are locked: poll `get_job`
+        until the status is COMPLETED, then read the report with
+        `get_classification_report`.
+
+        Args:
+            job_id: Job identifier.
+        """
+        settings = get_settings()
+        response = await classification.confirm_job_report(
+            job_id, settings.auth)
+        return {"success": True, "data": response, "error": None}
+
+    @mcp.tool()
+    @log_tool
+    async def cancel_job_report(job_id: str) -> dict:
+        """Cancel a review-gated job before its report is confirmed.
+
+        For a job created with requires_review=true that is still being
+        reviewed. The job moves to CANCELLED and its review data is
+        discarded. A job whose report has already been confirmed cannot be
+        cancelled this way.
+
+        Args:
+            job_id: Job identifier.
+        """
+        settings = get_settings()
+        response = await classification.cancel_job_report(
+            job_id, settings.auth)
+        return {"success": True, "data": response, "error": None}
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
     @log_tool
