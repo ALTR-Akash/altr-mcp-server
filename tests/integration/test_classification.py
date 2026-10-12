@@ -1126,3 +1126,34 @@ async def test_report_creation_failure_passes_the_cause_through(
     assert inner["status_code"] == 404
     # Only the creation call was made; no download was attempted.
     assert len(httpx_mock.get_requests()) == 1
+
+
+OLTP_ARGS = {"agent_id": "a", "repo_name": "r", "service_user_name": "s",
+             "collection_name": "C"}
+
+
+async def test_create_oltp_job_sends_no_sampling_for_a_metadata_scan(
+        httpx_mock: HTTPXMock, test_env, mcp):
+    httpx_mock.add_response(status_code=201, json={"job_id": "j1"})
+    fn = await get_tool(mcp, "create_oltp_job")
+    await fn(**OLTP_ARGS, sample_strategy="METADATA", sample_size=500)
+    body = json.loads(httpx_mock.get_requests()[0].content)
+    assert body["sample_strategy"] == "METADATA"
+    assert "sample_size" not in body and "sample_type" not in body
+
+
+async def test_create_oltp_job_keeps_the_row_default(
+        httpx_mock: HTTPXMock, test_env, mcp):
+    httpx_mock.add_response(status_code=201, json={"job_id": "j1"})
+    fn = await get_tool(mcp, "create_oltp_job")
+    await fn(**OLTP_ARGS)
+    body = json.loads(httpx_mock.get_requests()[0].content)
+    assert (body["sample_size"], body["sample_type"]) == (1000, "ROWS")
+
+
+async def test_create_oltp_job_needs_a_size_for_percent_sampling(
+        httpx_mock: HTTPXMock, test_env, mcp):
+    fn = await get_tool(mcp, "create_oltp_job")
+    with pytest.raises(Exception, match="required when sample_type is PERCENT"):
+        await fn(**OLTP_ARGS, sample_type="PERCENT")
+    assert not httpx_mock.get_requests()

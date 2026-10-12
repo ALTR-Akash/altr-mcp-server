@@ -79,7 +79,7 @@ def register(mcp: FastMCP) -> None:
 
         Valid `target` values: ROW_DATA, METADATA, COLUMN_LOCATION, GDLP,
         SNOWFLAKE_NATIVE, CONTENT_TYPE, DATA_LENGTH, COLUMN_SIZE,
-        AMAZON_COMPREHEND.
+        AMAZON_COMPREHEND, ENTROPY.
 
         AMAZON_COMPREHEND leaf fields: `entity_type` (e.g. "SSN", "CREDIT_DEBIT_NUMBER",
         "EMAIL"), `minimum_score` (0.0–1.0, default 0.5).
@@ -93,6 +93,10 @@ def register(mcp: FastMCP) -> None:
         CONTENT_TYPE leaf fields: `content_format` or `content_formats` (list),
         `dominance_threshold`. Formats: JSON, XML, CSV, PDF, DOCX, XLSX, PNG,
         JPEG, ZIP, GZIP, PARQUET, and more.
+
+        ENTROPY leaf fields (flags values that look like secret keys):
+        `minimum_evidence_bits`, `minimum_key_bits`, `alphabet_classes`,
+        `decode_base64`, `cumulative`.
 
         All leaf conditions support `negated: true`.
 
@@ -424,8 +428,7 @@ def register(mcp: FastMCP) -> None:
                 `get_jobs` call.
             status: Filter by job status (e.g. RUNNING,
                 PAUSED, COMPLETED, CANCELLED, FAILED).
-            job_type: Filter by job type (FULL,
-                INCREMENTAL, RECLASSIFICATION).
+            job_type: Filter by job type (FULL or INCREMENTAL).
             database_id: Restrict to a specific database
                 (numeric ID from `get_databases` /
                 `get_database_id`).
@@ -533,7 +536,7 @@ def register(mcp: FastMCP) -> None:
             ) -> dict:
         """Run an ALTR-native classification scan on a Snowflake database.
 
-        Uses ALTR's own regex-based classifiers grouped in a collection.
+        Uses ALTR's own classifiers grouped in a collection.
         This is NOT for GDLP (Google DLP) scans — use `create_gdlp_job`
         for that instead.
 
@@ -544,14 +547,18 @@ def register(mcp: FastMCP) -> None:
         `get_classification_report` to view results.
 
         Args:
-            job_type: Job type to run (FULL, INCREMENTAL, RECLASSIFICATION).
+            job_type: Job type to run (FULL or INCREMENTAL).
             database_id: Target database ID (from
                 `get_databases` / `get_database_id`).
             collection_name: Classifier collection to use for this run.
-            condition_types: Optional list of condition targets to enable
-                beyond ROW_DATA. Valid values: ROW_DATA, METADATA,
-                COLUMN_LOCATION, CONTENT_TYPE, DATA_LENGTH, COLUMN_SIZE.
-                GDLP and AMAZON_COMPREHEND require separate job types.
+            condition_types: Optional full set of condition targets to
+                evaluate. A list replaces the server default rather than
+                adding to it, so include every target your classifiers use;
+                an omitted target is not evaluated and its conditions count
+                as passing within an AND. Valid values: ROW_DATA, METADATA,
+                COLUMN_LOCATION, SNOWFLAKE_NATIVE, CONTENT_TYPE, DATA_LENGTH,
+                COLUMN_SIZE, ENTROPY. GDLP and AMAZON_COMPREHEND require
+                separate job types.
         """
         settings = get_settings()
         params = {
@@ -593,12 +600,18 @@ def register(mcp: FastMCP) -> None:
                 in the collection is evaluated (GDLP info-type conditions or
                 otherwise), subject to the condition_types evaluation matrix.
                 When omitted, all default Google DLP infoTypes are used.
-            condition_types: Optional additional condition targets to enable.
-                Valid values: ROW_DATA, METADATA, COLUMN_LOCATION,
-                CONTENT_TYPE, DATA_LENGTH, COLUMN_SIZE, AMAZON_COMPREHEND.
-            sample_size: Optional number of rows to sample per column
-                (defaults to 100 on the server when omitted).
-            sample_type: Optional sampling unit (defaults to ROWS).
+            condition_types: Optional full set of condition targets to
+                evaluate. A list replaces the server default (GDLP, METADATA,
+                COLUMN_LOCATION, CONTENT_TYPE) rather than adding to it, so
+                include every target your classifiers use, GDLP among them.
+                Valid values: GDLP,
+                SNOWFLAKE_NATIVE, ROW_DATA, METADATA, COLUMN_LOCATION,
+                CONTENT_TYPE, DATA_LENGTH, COLUMN_SIZE, AMAZON_COMPREHEND,
+                ENTROPY.
+            sample_size: Optional rows to sample per column, or a percentage
+                when sample_type is PERCENT (server default 100).
+            sample_type: Optional sampling unit: ROWS (a fixed count, the
+                default) or PERCENT.
         """
         settings = get_settings()
         params = {
@@ -658,7 +671,7 @@ def register(mcp: FastMCP) -> None:
                 Databricks GDLP does not evaluate classifier regex against
                 samples by default). Valid values: ROW_DATA, METADATA,
                 COLUMN_LOCATION, GDLP, SNOWFLAKE_NATIVE, CONTENT_TYPE,
-                DATA_LENGTH, COLUMN_SIZE, AMAZON_COMPREHEND.
+                DATA_LENGTH, COLUMN_SIZE, AMAZON_COMPREHEND, ENTROPY.
         """
         settings = get_settings()
         params = {
@@ -679,7 +692,7 @@ def register(mcp: FastMCP) -> None:
             collection_name: str,
             classification_type: int = 5,
             sample_strategy: str = "ROWS",
-            sample_size: int = 1000,
+            sample_size: int | None = None,
             sample_type: str = "ROWS",
             condition_types: list[str] | None = None,
             sid: str | None = None,
@@ -705,20 +718,35 @@ def register(mcp: FastMCP) -> None:
             collection_name: Classifier collection to run.
             classification_type: ALTR classification type code (default 5=ALTR
                 Native). Valid values: 5=ALTR Native, 6=GDLP BYOK.
-            sample_strategy: Sampling strategy: ROWS, METADATA, ROW_COUNT,
-                ROW_PERCENT, or COMBINED (default ROWS).
-            sample_size: Number of values sampled per column (default 1000).
-            sample_type: Sampling unit (default ROWS).
-            condition_types: Condition targets to enable. Required to activate
-                METADATA-only scans, AMAZON_COMPREHEND, DATA_LENGTH, COLUMN_SIZE,
-                or CONTENT_TYPE evaluation. Valid values: ROW_DATA, METADATA,
-                COLUMN_LOCATION, CONTENT_TYPE, DATA_LENGTH, COLUMN_SIZE,
-                AMAZON_COMPREHEND, GDLP. Example: ["ROW_DATA", "METADATA"].
+            sample_strategy: Sampling strategy: ROWS (sampled row data),
+                METADATA (column names only) or COMBINED (both). Default ROWS;
+                GDLP BYOK supports ROWS only.
+            sample_size: Rows sampled per column (default 1000), or a
+                percentage from 1 to 100 when sample_type is PERCENT, where it
+                is required. Not sent for METADATA, which samples no rows.
+            sample_type: Sampling unit: ROWS (a fixed count, default) or
+                PERCENT. Not sent for METADATA.
+            condition_types: Optional full set of condition targets to
+                evaluate. When omitted the server derives it from
+                sample_strategy and classification_type; a list replaces that
+                default rather than adding to it. AMAZON_COMPREHEND must be
+                listed to run; GDLP is included by default only for
+                classification_type 6. Valid values: ROW_DATA, METADATA, COLUMN_LOCATION,
+                CONTENT_TYPE, DATA_LENGTH, COLUMN_SIZE, AMAZON_COMPREHEND,
+                GDLP, ENTROPY. Example: ["ROW_DATA", "METADATA"].
             sid: Oracle SID (Oracle repos only).
             service_name: Oracle service name or alternate connection identifier.
             task_id: Link this on-demand run to an existing scheduled task UUID.
         """
         settings = get_settings()
+        if sample_strategy == "METADATA":
+            # A metadata scan reads column names only; the API rejects sampling.
+            sample_size, sample_type = None, None
+        elif sample_size is None:
+            if sample_type == "PERCENT":
+                raise ValueError(
+                    "sample_size (1-100) is required when sample_type is PERCENT.")
+            sample_size = 1000
         params = {
             "agent_id": agent_id,
             "repo_name": repo_name,
