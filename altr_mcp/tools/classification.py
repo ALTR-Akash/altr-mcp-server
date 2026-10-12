@@ -15,8 +15,7 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
     @log_tool
     async def get_classifiers() -> dict:
-        """List all available data classifiers
-        (pattern-based detectors) in ALTR.
+        """List all available data classifiers in ALTR.
 
         Classifiers automatically detect sensitive data
         types like SSNs, emails,
@@ -45,27 +44,18 @@ def register(mcp: FastMCP) -> None:
     @log_tool
     async def create_classifier(
             classifier_name: str,
-            description: str | None = None,
-            minimum_threshold: int | None = None,
-            pattern: str | None = None,
-            sample_size: int | None = None,
-            compound_ruleset: dict | None = None
+            compound_ruleset: dict,
+            description: str | None = None
             ) -> dict:
-        """Create a custom data classifier for detecting specific data patterns.
+        """Create a custom data classifier defined by a compound ruleset.
 
-        Prefer **compound ruleset mode** for new classifiers — even a single
-        ROW_DATA condition — so all detection logic lives in one consistent,
-        composable place. The legacy top-level `pattern` field still works but
-        is discouraged.
-
-        **Compound ruleset mode (preferred)** — provide `compound_ruleset` for
-        classifiers that combine one or more condition types (ROW_DATA regex,
-        METADATA column-name matching, AMAZON_COMPREHEND entity detection,
-        DATA_LENGTH, CONTENT_TYPE, GDLP info-types, etc.) using AND/OR logic.
-
-        **Regex mode (legacy)** — provide a top-level `pattern` and
-        `minimum_threshold`. Equivalent to a single ROW_DATA condition; kept
-        for backward compatibility. Sampling is set on the job, not here.
+        All detection logic lives in `compound_ruleset`: one or more
+        conditions (ROW_DATA regex, METADATA column-name matching,
+        AMAZON_COMPREHEND entity detection, DATA_LENGTH, CONTENT_TYPE, GDLP
+        info-types and more) combined with AND/OR. A plain regex classifier
+        is a ruleset with a single ROW_DATA condition carrying the pattern
+        and its minimum_threshold. Always set minimum_threshold on ROW_DATA
+        leaves. Sampling is set on the job, not here.
 
         Compound ruleset structure:
         ```json
@@ -108,24 +98,13 @@ def register(mcp: FastMCP) -> None:
 
         Args:
             classifier_name: Unique name for the classifier.
+            compound_ruleset: Nested AND/OR condition tree, as above.
             description: Human-readable explanation of what it detects.
-            minimum_threshold: Percent (0-100) confidence required
-                to consider a column a match (legacy regex mode).
-            pattern: Regex pattern used to match values (legacy regex mode;
-                prefer a ROW_DATA condition in `compound_ruleset`).
-            sample_size: Legacy and discouraged — sampling is configured at the
-                job level (`create_job` / `create_gdlp_job` / `create_oltp_job`),
-                not on the classifier. Retained only for backward compatibility.
-            compound_ruleset: Nested AND/OR condition tree (preferred).
-                When provided, `pattern` and `minimum_threshold` are optional.
         """
         settings = get_settings()
         params = {
             "classifier_name": classifier_name,
             "description": description,
-            "minimum_threshold": minimum_threshold,
-            "pattern": pattern,
-            "sample_size": sample_size,
             "compound_ruleset": compound_ruleset,
         }
         response = await classification.create_classifier(
@@ -137,22 +116,17 @@ def register(mcp: FastMCP) -> None:
     async def update_classifier(
             classifier_name: str,
             description: str | None = None,
-            minimum_threshold: int | None = None,
-            pattern: str | None = None,
-            sample_size: int | None = None,
             compound_ruleset: dict | None = None
             ) -> dict:
         """Update an existing custom classifier. Only provided fields are changed.
 
+        Passing `compound_ruleset` also removes any legacy top-level pattern,
+        so the ruleset alone decides matches. To keep a legacy regex, include
+        it as a ROW_DATA condition with its own minimum_threshold.
+
         Args:
             classifier_name: Exact classifier name to update.
             description: Updated description.
-            minimum_threshold: Updated confidence threshold (0-100).
-            pattern: Updated regex pattern (legacy; prefer a ROW_DATA condition
-                in `compound_ruleset`).
-            sample_size: Legacy and discouraged — sampling is configured at the
-                job level, not on the classifier. Retained for backward
-                compatibility.
             compound_ruleset: Updated compound ruleset. See `create_classifier`
                 for structure and valid condition targets.
         """
@@ -160,14 +134,11 @@ def register(mcp: FastMCP) -> None:
         data = {}
         if description is not None:
             data["description"] = description
-        if minimum_threshold is not None:
-            data["minimum_threshold"] = minimum_threshold
-        if pattern is not None:
-            data["pattern"] = pattern
-        if sample_size is not None:
-            data["sample_size"] = sample_size
         if compound_ruleset is not None:
             data["compound_ruleset"] = compound_ruleset
+            # Retire a legacy top-level pattern; null removes it on the API. The
+            # classifier-level threshold stays: Snowflake reads 0 as match-all.
+            data["pattern"] = None
         response = await classification.update_classifier(
             classifier_name, data, settings.auth)
         return {"success": True, "data": response, "error": None}

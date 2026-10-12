@@ -8,7 +8,7 @@ Discover sensitive data in your databases using automated classification. Manage
 |------|-------------|
 | `get_classifiers` | List all available data classifiers |
 | `get_classifier` | Get details for a single classifier |
-| `create_classifier` | Create a custom classifier (regex or compound ruleset) |
+| `create_classifier` | Create a custom classifier defined by a compound ruleset |
 | `update_classifier` | Update an existing custom classifier |
 | `delete_classifier` | Remove a custom classifier |
 | `get_collections` | List classifier collections |
@@ -124,20 +124,13 @@ Get details for a single classifier by name.
 
 ### create_classifier
 
-Create a custom data classifier. Supports two authoring modes:
-
-**Regex mode** — provide `pattern`, `minimum_threshold`, and `sample_size` to detect column values matching a regex.
-
-**Compound ruleset mode** — provide `compound_ruleset` for advanced classifiers that combine multiple condition types (METADATA, AMAZON_COMPREHEND, DATA_LENGTH, CONTENT_TYPE, etc.) using AND/OR logic.
+Create a custom data classifier defined by a compound ruleset: one or more conditions (ROW_DATA regex, METADATA, AMAZON_COMPREHEND, DATA_LENGTH, CONTENT_TYPE and more) combined with AND/OR. A plain regex classifier is a ruleset with a single ROW_DATA condition carrying the pattern and its `minimum_threshold`. Sampling is set on the job, not the classifier.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `classifier_name` | str | yes | Unique name for the classifier |
+| `compound_ruleset` | dict | yes | Nested AND/OR condition tree |
 | `description` | str | no | Human-readable explanation of what it detects |
-| `minimum_threshold` | int | no | Percent (0-100) confidence required (regex mode) |
-| `pattern` | str | no | Regex pattern used to match values (regex mode) |
-| `sample_size` | int | no | Number of values ALTR should sample per column |
-| `compound_ruleset` | dict | no | Nested AND/OR condition tree (compound mode) |
 
 **Compound ruleset structure:**
 ```json
@@ -165,21 +158,18 @@ Create a custom data classifier. Supports two authoring modes:
 
 **DATA_LENGTH / COLUMN_SIZE leaf fields:** `length` or `size`, numeric `comparator` (`greater_than`/`less_than`/`equals`/etc.), optional `trim`.
 
-All conditions support `negated: true`.
+Always set `minimum_threshold` on ROW_DATA leaves. All conditions support `negated: true`.
 
 ---
 
 ### update_classifier
 
-Update an existing custom classifier. Only provided fields are changed.
+Update an existing custom classifier. Only provided fields are changed. Passing `compound_ruleset` also removes any legacy top-level pattern, so the ruleset alone decides matches. To keep a legacy regex, include it as a ROW_DATA condition with its own `minimum_threshold`.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `classifier_name` | str | yes | Exact classifier name to update |
 | `description` | str | no | Updated description |
-| `minimum_threshold` | int | no | Updated confidence threshold (0-100) |
-| `pattern` | str | no | Updated regex pattern |
-| `sample_size` | int | no | Updated sample size |
 | `compound_ruleset` | dict | no | Updated compound ruleset |
 
 ---

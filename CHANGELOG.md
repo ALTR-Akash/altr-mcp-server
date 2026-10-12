@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- Classifiers are defined through `compound_ruleset` only, and
+  `create_classifier` now requires it. A regex classifier is a ruleset with
+  a single ROW_DATA condition carrying the pattern and its
+  `minimum_threshold`; sampling is configured on the job.
+- `update_classifier` with a `compound_ruleset` also removes any legacy
+  top-level pattern, so the ruleset alone decides matches. Include a
+  ROW_DATA condition to keep a legacy regex. Classifiers not updated keep
+  their existing definition.
+
+### Removed
+- The `pattern`, `minimum_threshold` and `sample_size` parameters of
+  `create_classifier` and `update_classifier`.
+
 ## [0.7.1]
 
 ### Security

@@ -59,25 +59,42 @@ async def test_create_classifier_happy_path(
         "classifier": {
             "classifier_name": "MY_CLASSIFIER",
             "description": "Test classifier",
-            "pattern": r"\d{3}-\d{2}-\d{4}",
-            "minimum_threshold": 80,
-            "sample_size": 100,
-            "sample_type": "ROWS",
+            "compound_ruleset": {"operator": "AND", "conditions": [
+                {"target": "ROW_DATA", "pattern": r"\d{3}-\d{2}-\d{4}",
+                 "comparator": "matches", "minimum_threshold": 80}]},
             "collection_names": [],
             "collection_count": 0,
         },
     })
+    ruleset = {"operator": "AND", "conditions": [{
+        "target": "ROW_DATA", "pattern": r"\d{3}-\d{2}-\d{4}",
+        "comparator": "matches", "minimum_threshold": 80}]}
     fn = await get_tool(mcp, "create_classifier")
     result = await fn(
         classifier_name="MY_CLASSIFIER",
         description="Test classifier",
-        minimum_threshold=80,
-        pattern=r"\d{3}-\d{2}-\d{4}",
-        sample_size=100,
+        compound_ruleset=ruleset,
     )
     assert result["success"] is True
     assert result["error"] is None
-    assert "data" in result
+    assert json.loads(httpx_mock.get_requests()[0].content) == {
+        "classifier_name": "MY_CLASSIFIER",
+        "description": "Test classifier",
+        "compound_ruleset": ruleset,
+    }
+
+
+@pytest.mark.parametrize("tool", ["create_classifier", "update_classifier"])
+async def test_classifier_tools_offer_only_rulesets(mcp, tool):
+    """Pattern-only classifiers are not offered; logic lives in the ruleset."""
+    properties = (await mcp.get_tool(tool)).parameters["properties"]
+    assert not {"pattern", "minimum_threshold", "sample_size"} & set(properties)
+    assert "compound_ruleset" in properties
+
+
+async def test_create_classifier_requires_a_ruleset(mcp):
+    required = (await mcp.get_tool("create_classifier")).parameters["required"]
+    assert set(required) == {"classifier_name", "compound_ruleset"}
 
 
 # ── delete_classifier ───────────────────────────────────────────────────
@@ -663,20 +680,18 @@ async def test_update_classifier_sends_every_provided_field(
     result = await fn(
         classifier_name="C",
         description="updated",
-        minimum_threshold=55,
-        pattern=r"\d+",
-        sample_size=250,
-        compound_ruleset={"operator": "AND", "conditions": []},
+        compound_ruleset={"operator": "AND", "conditions": [
+            {"target": "METADATA", "comparator": "contains", "pattern": "ssn"}]},
     )
     assert result["success"] is True
     request = httpx_mock.get_requests()[0]
     assert request.method == "PATCH"
     assert json.loads(request.content) == {
         "description": "updated",
-        "minimum_threshold": 55,
-        "pattern": r"\d+",
-        "sample_size": 250,
-        "compound_ruleset": {"operator": "AND", "conditions": []},
+        "compound_ruleset": {"operator": "AND", "conditions": [
+            {"target": "METADATA", "comparator": "contains", "pattern": "ssn"}]},
+        # Only the legacy pattern is cleared; a 0 threshold would match all.
+        "pattern": None,
     }
 
 
