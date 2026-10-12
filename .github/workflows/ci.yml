@@ -122,7 +122,7 @@ jobs:
         with:
           persist-credentials: false
           sparse-checkout: .github/scripts
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         continue-on-error: true  # nothing to download if the check never finished
         with:
           pattern: findings-*
