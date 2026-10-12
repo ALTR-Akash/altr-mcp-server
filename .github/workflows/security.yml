@@ -8,14 +8,16 @@ on:
   schedule:
     # Weekly Monday 09:00 UTC — re-scan against the latest CVE feed
     - cron: "0 9 * * 1"
+  workflow_dispatch:
 
 permissions:
   contents: read
   security-events: write  # required to upload SARIF to the Security tab
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Per event, so a push to main never cancels the weekly run or vice versa.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   trivy-fs:
@@ -34,9 +36,8 @@ jobs:
           output: trivy-results.sarif
           # Vulnerability + secret + misconfiguration detection
           scanners: "vuln,secret,misconfig"
-          # Fail the build only on HIGH / CRITICAL findings; lower severities
-          # surface in the Security tab without breaking the build
-          severity: "HIGH,CRITICAL"
+          # Fails on a finding at any severity: with SARIF output the action
+          # drops the severity filter unless limit-severities-for-sarif is set.
           exit-code: "1"
           ignore-unfixed: true
 
@@ -51,3 +52,43 @@ jobs:
         with:
           sarif_file: trivy-results.sarif
           category: trivy-fs
+
+      - name: Summarize the findings
+        if: failure() && github.event_name == 'schedule'
+        run: python3 .github/scripts/summarize_findings.py trivy trivy-results.sarif > findings.md
+
+      - if: failure() && github.event_name == 'schedule'
+        uses: actions/upload-artifact@v4
+        with:
+          name: findings-security
+          path: findings.md
+
+  report-failure:
+    # A scheduled run has no pull request to show its result, so a finding
+    # opens an issue assigned to the maintainers.
+    needs: [trivy-fs]
+    # A job that times out ends as cancelled, not failed, so check both.
+    if: >-
+      always() && github.event_name == 'schedule' &&
+      (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - uses: actions/download-artifact@v4
+        continue-on-error: true  # nothing to download if the check never finished
+        with:
+          pattern: findings-*
+          path: findings
+      - run: .github/scripts/report-scheduled-failure.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHECK_NAME: Weekly security scan
+          FINDINGS_DIR: findings
+          ISSUE_ASSIGNEES: altr-andrea,altrparker
