@@ -298,12 +298,14 @@ DOC_LINK_HOST = re.compile(
 )
 
 # docs.altr.com is the public documentation site; the other two are marketing.
+# docs.dam-alerting is the public DAM Alerting API reference.
 # api/altrnet are the documented default API endpoints, which appear as values
 # in the README settings table and in .env.example rather than as links.
 # Anything else in the altr.com space is internal or per-environment.
 ALLOWED_DOC_HOSTS = {
     "docs.altr.com", "www.altr.com", "altr.com",
     "api.live.altr.com", "altrnet.live.altr.com",
+    "docs.dam-alerting.live.altr.com",
 }
 
 # Everything that leaves the repo: the PyPI long_description, the wheel

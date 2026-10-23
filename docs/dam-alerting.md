@@ -2,7 +2,7 @@
 
 Manage DAM (Data Access Monitoring) alert rules and work the alerts they fire. A rule evaluates sidecar (OLTP) and/or Snowflake audit events against a filter tree. A **match** rule fires one alert per matching event; a **threshold** rule counts matches in a tumbling window and fires once per window when the count reaches its threshold. Alerts can be acknowledged and commented on.
 
-Tools call `https://<ORG_ID>.dam-alerting.live.altr.com/v1/dam-alerting`. Override with `ALTR_DAM_ALERTING_BASE_URL`.
+Tools call `https://<ORG_ID>.dam-alerting.live.altr.com/v1/dam-alerting`. Override with `ALTR_DAM_ALERTING_BASE_URL`. API reference: [DAM Alerting API docs](https://docs.dam-alerting.live.altr.com/v1/dam-alerting/docs).
 
 ## Tool Summary
 
