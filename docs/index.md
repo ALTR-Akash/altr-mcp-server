@@ -14,6 +14,7 @@ Tools for managing data security on the ALTR platform.
 - [Access Requests](access-requests.md) — Submit and manage data access approval requests (6 tools)
 - [Audits](audits.md) — Search sidecar, Snowflake query, and system audit logs (6 tools)
 - [Audit Reports](audit-report.md) — Create, schedule, and review structured audit report definitions and instances (17 tools)
+- [DAM Alerting](dam-alerting.md) — Create match and threshold alert rules over audit events; triage, comment on, and acknowledge the alerts they fire (10 tools)
 - [Telemetry](telemetry.md) — Monitor agent and sidecar instance health (9 tools)
 - [Sidecar Configuration](sidecar-config.md) — Manage agents, repos, sidecars, listeners, bindings, and tasks (37 tools)
 - [Vault Tokenization](vault-tokenization.md) — Tokenize and detokenize values using ALTR vaulted tokenization (4 tools)

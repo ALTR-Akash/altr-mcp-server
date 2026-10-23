@@ -33,12 +33,13 @@ consistent meaning:
                          matching get_*_results tool, using the search_uuid
                          or token it returns
 
-Two things this table does not cover. Verbs outside this table — approve_,
-deny_, cancel_, confirm_, archive_, restore_, deactivate_, rotate_, record_,
-revoke_, pin_, unpin_, import_, remove_ — mean what they say; read the tool
-description. And the tokenization domains put the domain first rather than
-the verb: vault_tokenize, critical_delete_tokens. Read the verb after that
-prefix, and note that both domains can delete tokens irreversibly.
+Two things this table does not cover. Verbs outside this table —
+acknowledge_, approve_, deny_, cancel_, confirm_, archive_, restore_,
+deactivate_, rotate_, record_, revoke_, pin_, unpin_, import_, remove_ —
+mean what they say; read the tool description. And the tokenization domains
+put the domain first rather than the verb: vault_tokenize,
+critical_delete_tokens. Read the verb after that prefix, and note that both
+domains can delete tokens irreversibly.
 
 The disconnect_/delete_ split is deliberate: disconnect_database leaves the
 database untouched, while delete_policy destroys the policy. Objects that
@@ -48,7 +49,7 @@ disconnected, whichever verb their name uses.
 Sidecar configuration tools carry an sc_ infix (list_sc_repos,
 create_sc_sidecar) to distinguish them from similarly named tools elsewhere.
 
-The 13 domains:
+The 14 domains:
 
   Databases              connect Snowflake, OLTP, and Databricks data sources;
                          also get_service_users for Snowflake keypair auth
@@ -62,6 +63,8 @@ The 13 domains:
   Audits                 sidecar, Snowflake query, and system audit search
   Audit Reports          scheduled report definitions and instances,
                          comments, sign-offs
+  DAM Alerting           alert rules over sidecar and Snowflake audit
+                         events; triage, comment on, and acknowledge alerts
   Telemetry              agent and sidecar instance health
   Sidecar Configuration  sidecar proxy agents, repos, repo users, sidecar
                          service users, sidecars, listeners, bindings

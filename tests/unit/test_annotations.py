@@ -77,6 +77,10 @@ GET_LIST_TOOLS = [
     "get_report_instance_download_url",
     "list_report_comments",
     "get_report_sign_off", "list_report_sign_offs",
+    # dam_alerting.py
+    "list_dam_rules", "get_dam_rule",
+    "list_dam_alerts", "get_dam_alert",
+    "list_dam_alert_comments",
     # vault_tokenization.py
     "vault_detokenize", "vault_partial_detokenize",
     # critical_tokenization.py
@@ -106,6 +110,8 @@ DESTRUCTIVE_TOOLS = [
     "disconnect_sc_sidecar", "disconnect_sc_sidecar_binding",
     # audit_report.py
     "archive_report_definition",
+    # dam_alerting.py
+    "delete_dam_rule",
     # vault_tokenization.py
     "vault_delete_tokens",
     # critical_tokenization.py
@@ -160,6 +166,9 @@ NO_ANNOTATION_TOOLS = [
     "create_report_comment",
     "pin_report_comment", "unpin_report_comment",
     "create_report_sign_off",
+    # dam_alerting.py
+    "create_dam_rule", "update_dam_rule",
+    "acknowledge_dam_alert", "create_dam_alert_comment",
     # vault_tokenization.py
     "vault_tokenize",
     # critical_tokenization.py

@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `revoke_bulk_job_decision` undoes one.
 - `get_job_findings_leaves` lists every finding in a job in one paginated
   stream, optionally filtered by confidence tier.
+- DAM Alerting tools (10): create, list, get, update and delete alert rules,
+  and list, get, acknowledge and comment on the alerts they fire. See
+  `docs/dam-alerting.md`.
+- `ALTR_DAM_ALERTING_BASE_URL` overrides the DAM Alerting endpoint, which
+  defaults to `https://<ORG_ID>.dam-alerting.live.altr.com/v1/dam-alerting`.
 
 ### Changed
 - Classifiers are defined through `compound_ruleset` only, and

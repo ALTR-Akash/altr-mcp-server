@@ -19,8 +19,8 @@ than your ALTR tenant does, that is the line to check.
 | Redacted | Why |
 |---|---|
 | `values` | the plaintext being tokenized — `vault_tokenize(values={"ssn": ...})` is the secret itself |
-| `text`, `comments`, `attestation`, `justification` | human free text, where unannounced PII arrives |
-| `statement_text_contains`, `filters` | an audit search term is a data value: someone hunting a value types that value, and the report-definition filter groups carry the same term |
+| `text`, `comment`, `comments`, `attestation`, `justification` | human free text, where unannounced PII arrives |
+| `statement_text_contains`, `filters`, `filter_tree` | an audit search term is a data value: someone hunting a value types that value, and the report-definition filter groups and DAM alert rule filter trees carry the same term |
 | `connection_string` | a DSN embeds its password inline, as `user:pw@host` |
 | `password`, `secret`, `credentials`, `passphrase`, `private_key`, `api_key`, `auth_token`, `access_key` | the bare credential names, which the suffix rule below does not match |
 | anything ending `_password`, `_secret`, `_credential`, `_credentials`, `_private_key`, `_passphrase` | applied as a suffix rule, so a new argument with one of these suffixes is covered when it is added |

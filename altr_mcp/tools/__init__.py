@@ -13,6 +13,7 @@ def register_all(mcp: FastMCP) -> None:
         audit_report,
         classification,
         critical_tokenization,
+        dam_alerting,
         database,
         key_management,
         policy,
@@ -31,6 +32,7 @@ def register_all(mcp: FastMCP) -> None:
     telemetry.register(mcp)
     audit.register(mcp)
     audit_report.register(mcp)
+    dam_alerting.register(mcp)
     sidecar_config.register(mcp)
     vault_tokenization.register(mcp)
     critical_tokenization.register(mcp)
