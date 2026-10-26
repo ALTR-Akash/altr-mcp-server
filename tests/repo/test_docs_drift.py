@@ -32,14 +32,8 @@ from altr_mcp.tools import register_all
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DOCS_DIR = REPO_ROOT / "docs"
 
-# Tool modules that are deliberately not domains. ``support_mode`` holds the
-# three mode-control tools (``enter_support_mode``, ``request_write_unlock``,
-# ``exit_support_mode``); they change what the rest of the server will do
-# rather than manage anything on the ALTR platform, so they belong in
-# docs/support-mode.md under Reference, not as a fourteenth domain in the
-# README table, the index bullets, and the domain list inside
-# altr_mcp/instructions.md. Adding a module here is a claim that it is not a
-# domain, not a way to skip documenting it.
+# Tool modules that are not domains. ``support_mode`` is documented in
+# docs/support-mode.md. Listing a module here does not exempt it from docs.
 NON_DOMAIN_MODULES = frozenset({"support_mode"})
 
 # One row per tool module: (display name, domain doc, module name).
@@ -75,10 +69,8 @@ DOC_SOURCES = (
 # A snake_case identifier: two or more lowercase segments.
 SNAKE_CASE = re.compile(r"\b([a-z][a-z0-9]*(?:_[a-z0-9]+)+)\b")
 
-# Identifiers that look tool-shaped but are neither tools nor tool
-# parameters. list_value is a DAM Alerting filter-tree field, and
-# list_changed is the tail of the MCP notifications/tools/list_changed
-# notification.
+# Tool-shaped names that are not tools: list_value is a DAM Alerting
+# filter field, and list_changed is from notifications/tools/list_changed.
 NOT_TOOLS = frozenset({"list_value", "list_changed"})
 
 # A trailing "(N tools)" on a heading or a list item.

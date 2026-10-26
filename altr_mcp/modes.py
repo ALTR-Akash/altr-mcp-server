@@ -1,53 +1,22 @@
-"""Support read-only mode: the tool allow-list.
+"""Support read-only mode: the tool allow-list, and parse_tool_list().
 
-Also holds parse_tool_list(), the single parser for comma-separated
-tool-name env vars, shared by the RESTRICTED_TOOLS deny-list in
-middleware.py and the unlock refusal in tools/support_mode.py so that the
-two cannot disagree about what the operator wrote.
-
-When SUPPORT_MODE is enabled, only the tools named in
-SUPPORT_ALLOWED_TOOLS are exposed. Everything else is hidden from
-tools/list and rejected on tools/call.
-
-This is an allow-list, not a deny-list, and that is deliberate: a tool
-added in a future release is unavailable in support mode until someone
-adds it here on purpose. A deny-list would expose it by default.
-
-WHY THIS IS NOT DERIVED FROM readOnlyHint
------------------------------------------
-Most of this list is the set of tools carrying
-ToolAnnotations(readOnlyHint=True), but the two sets are not the same
-and must not be collapsed. They differ in both directions:
-
-  * DISCLOSURE_TOOLS carry readOnlyHint=True and are still excluded.
-    The hint is accurate — detokenization mutates nothing — but these
-    tools return real customer values. Support investigations read
-    configuration and audit history, never plaintext.
-
-  * SEARCH_POST_TOOLS carry no annotation and are still included. They
-    are unannotated because each one POSTs a search request rather than
-    issuing a GET. They do not change governed state, and they are the
-    entry point for every audit investigation.
-
-Keep this file and tests/unit/test_support_mode.py in step. The tests
-assert both divergences explicitly so that neither is "tidied up" into
-a plain readOnlyHint check later.
+The allow-list fails closed. Do not derive it from readOnlyHint: the two
+sets differ in both directions, and tests/unit/test_support_mode.py pins
+each difference. See docs/support-mode.md.
 """
 
 
 def parse_tool_list(raw: str | None) -> set[str]:
-    """Parse a comma-separated tool-name env var. One rule, both readers.
+    """Parse a comma-separated tool-name env var.
 
-    The middleware enforces RESTRICTED_TOOLS and request_write_unlock
-    reports on it. If the two parsed differently, the tool would refuse
-    an unlock the middleware would have allowed, or grant one it blocks.
+    The middleware and request_write_unlock both read RESTRICTED_TOOLS
+    through this, so they cannot disagree about it.
     """
     return {t.strip() for t in (raw or "").split(",") if t.strip()}
 
 
-# Unannotated because they POST a search request, but they change no
-# governed state and support cannot investigate an audit trail without
-# them. See module docstring.
+# Unannotated because they POST, but they change no governed state, and
+# every audit investigation starts with one.
 SEARCH_POST_TOOLS = frozenset({
     "search_audits",
     "search_query_audits",

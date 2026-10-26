@@ -5,12 +5,8 @@ RESTRICTED_TOOLS and, when an allow-list is in force, every tool absent
 from it. ValidationRedactionMiddleware keeps rejected argument values out
 of the error returned to the caller.
 
-The allow-list can be static (passed in at construction, which is what
-the SUPPORT_MODE env var does) or live (read from a
-SupportModeController, which is what the enter_support_mode tool does).
-Enforcement is the same code either way. That matters: the runtime path
-is not a softer kind of check, it is the same check reading a value that
-can change.
+The allow-list is static (SUPPORT_MODE) or live (a SupportModeController
+armed by enter_support_mode). Both run the same enforcement code.
 """
 
 from collections.abc import Set as AbstractSet
@@ -33,18 +29,10 @@ logger = structlog.get_logger(__name__)
 class ToolRestrictionMiddleware(Middleware):
     """Hide restricted tools from tools/list and block them on tools/call.
 
-    Filters, all applied:
-
-    * ``restricted_tools`` is a deny-list from RESTRICTED_TOOLS. Named
-      tools are withheld; everything else passes. This is the operator's
-      list, so it wins over everything below it, including a granted
-      unlock.
-    * ``allowed_tools`` is an optional static allow-list. When supplied,
-      only the named tools pass. This fails closed: a tool added in a
-      future release is withheld until it is added to the allow-list on
-      purpose.
-    * ``controller``, when supplied, provides the allow-list live and
-      may hold a one-shot unlock for a single named write.
+    * ``restricted_tools``: the RESTRICTED_TOOLS deny-list. It outranks
+      every other filter, a granted unlock included.
+    * ``allowed_tools``: an optional static allow-list. It fails closed.
+    * ``controller``: a live allow-list and an optional one-shot unlock.
     """
 
     def __init__(
@@ -103,12 +91,8 @@ class ToolRestrictionMiddleware(Middleware):
 
     async def on_call_tool(self, context: MiddlewareContext, call_next):
         tool_name = context.message.name
-        # No await from here down to consume_unlock() below. Requests are
-        # dispatched concurrently (tg.start_soon in the low-level server),
-        # and _withheld_reason() is what admits the call by reading
-        # pending_unlock, so any yield point between that read and the
-        # consume lets two parallel calls pass on one authorization.
-        # test_two_concurrent_calls_spend_one_unlock_exactly_once covers it.
+        # No await between this check and consume_unlock(). Requests run
+        # concurrently, so a yield here lets two calls spend one unlock.
         reason = self._withheld_reason(
             tool_name, self._effective_allow_list()
         )
@@ -122,8 +106,7 @@ class ToolRestrictionMiddleware(Middleware):
                 f"Tool '{tool_name}' is not available"
                 f" due to {reason}"
             )
-        # Spend any unlock for this tool, so its next call is blocked
-        # again. See the no-await note above.
+        # Spend any unlock now, so the next call to this tool is blocked.
         if self.controller is not None:
             self.controller.consume_unlock(tool_name)
         return await call_next(context)

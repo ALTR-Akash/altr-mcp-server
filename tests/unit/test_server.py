@@ -17,9 +17,7 @@ from altr_mcp.support_control import get_controller
 def _clear_cache():
     """Both singletons, or the second main() in a run reuses the first.
 
-    get_controller() decides hard versus soft on its first call, so a
-    controller cached under one SUPPORT_MODE value would silently answer
-    for a test that set the other.
+    get_controller() fixes hard versus soft on its first call.
     """
     get_settings.cache_clear()
     get_controller.cache_clear()
@@ -32,24 +30,15 @@ def _clear_cache():
 def _isolated_mcp(monkeypatch):
     """Give main() a throwaway server, so its mutations do not leak.
 
-    main() mutates the module-level mcp in two ways that nothing undoes:
-    it registers prompts, and FastMCP has no public way to unregister one;
-    and it appends a ToolRestrictionMiddleware, which accumulates. A test
-    that runs main() with SUPPORT_MODE or RESTRICTED_TOOLS set therefore
-    leaves an allow-list filter attached to the real server for every test
-    after it. Prefer this fixture for any test where main() gets past
-    settings validation; the --version and missing-env tests exit before
-    the first mutation, so they do not need it.
+    main() registers prompts and appends middleware, and neither can be
+    undone. Use this for any test where main() passes settings validation.
     """
     from fastmcp import FastMCP
 
     from altr_mcp import server
 
-    # Built like the real module-level server, both arguments included.
-    # main() only reassigns instructions when it has something to append,
-    # so a bare FastMCP would leave them None; omitting version= would
-    # report fastmcp's own, the bug
-    # test_server_info_version_is_ours_not_fastmcps guards.
+    # Match the real server: main() does not always set instructions, and
+    # without version= FastMCP reports its own version.
     monkeypatch.setattr(
         server,
         "mcp",
@@ -166,9 +155,7 @@ def test_support_mode_off_by_default(monkeypatch, _isolated_mcp):
 
     assert captured["allowed_tools"] is None
     assert "SUPPORT READ-ONLY MODE IS ACTIVE" not in server.mcp.instructions
-    # No hint either, by default. The block steers the model to latch the
-    # server read-only, so a user who never opted in should not get it and
-    # then need walking through the exit phrase to undo it.
+    # No hint by default: it steers the model to withhold writes.
     assert "SUPPORT READ-ONLY MODE IS AVAILABLE" not in (
         server.mcp.instructions
     )
@@ -196,9 +183,8 @@ def test_no_hint_or_prompts_on_http_transports(
         monkeypatch, _isolated_mcp, transport, support_mode):
     """Arming refuses on HTTP in every state, hard mode included.
 
-    Parametrised over SUPPORT_MODE because the unset case alone missed a
-    real bug: the prompts gate read `stdio or support_mode`, so hard mode
-    published all eight on HTTP where their first step cannot succeed.
+    Parametrised over SUPPORT_MODE so a gate of `stdio or support_mode`
+    fails.
     """
     monkeypatch.setenv("ORG_ID", "org")
     monkeypatch.setenv("MAPI_KEY", "key")
@@ -222,13 +208,8 @@ async def test_hard_mode_exposes_arming_and_withholds_standdown(
         monkeypatch, _isolated_mcp):
     """Assert through the protocol, not through the middleware kwargs.
 
-    This is the test that was missing. main() passes both a static
-    allow-list and the controller, and _effective_allow_list() intersects
-    them, so a static list omitting MODE_ENTRY_TOOLS silently stripped
-    arming in hard mode. Asserting on captured kwargs cannot catch that,
-    because the kwargs were exactly what the buggy line set. Every
-    published prompt opens by calling enter_support_mode, so this is the
-    one configuration where that has to work.
+    main()'s static list is intersected with the controller's, so only a
+    real tools/list shows whether hard mode still offers arming.
     """
     from fastmcp import Client
 
@@ -238,8 +219,7 @@ async def test_hard_mode_exposes_arming_and_withholds_standdown(
     monkeypatch.setenv("MAPI_KEY", "key")
     monkeypatch.setenv("MAPI_SECRET", "secret")
     monkeypatch.setenv("SUPPORT_MODE", "true")
-    # This test calls the tool, and arming succeeds on stdio only, so an
-    # exported MCP_TRANSPORT in the shell or CI job would fail it.
+    # Arming succeeds on stdio only, so clear any exported MCP_TRANSPORT.
     monkeypatch.delenv("MCP_TRANSPORT", raising=False)
 
     from altr_mcp.tools import register_all
@@ -315,11 +295,8 @@ def test_support_prompts_publishes_all_eight(
         monkeypatch, _isolated_mcp, support_mode):
     """Published on stdio in both states.
 
-    Parametrised over SUPPORT_MODE because the gate's comment says "stdio
-    only, hard mode included" and only the negative half was asserted:
-    narrowing it to `stdio and not support_mode` would otherwise pass.
-    Hard mode is where arming matters most, since every prompt opens with
-    it.
+    Hard mode is where arming matters most, so a gate of
+    `stdio and not support_mode` must fail.
     """
     monkeypatch.setenv("ORG_ID", "org")
     monkeypatch.setenv("MAPI_KEY", "key")
@@ -342,10 +319,8 @@ def test_support_mode_restricts_tools_and_appends_instructions(
         monkeypatch, _isolated_mcp):
     """The instructions must actually reach mcp.instructions.
 
-    They are built at import time, before load_dotenv() runs, so main()
-    has to reassign them. FastMCP exposes instructions as a property that
-    writes through to the low-level server reported in initialize; if a
-    future version stops doing that, this test is what catches it.
+    main() reassigns them after load_dotenv(). This catches a FastMCP that
+    stops writing the property through to initialize.
     """
     from altr_mcp.modes import SUPPORT_ALLOWED_TOOLS
     from altr_mcp.support_control import MODE_ENTRY_TOOLS
@@ -359,10 +334,8 @@ def test_support_mode_restricts_tools_and_appends_instructions(
 
     captured, server = _run_main_capturing_middleware(monkeypatch)
 
-    # Arming is included on purpose. The middleware intersects this static
-    # list with the controller's live one, so omitting MODE_ENTRY_TOOLS
-    # here strips enter_support_mode in hard mode. The protocol-level test
-    # above is what actually constrains that; this only pins the kwarg.
+    # Arming is included on purpose. The protocol-level test above proves
+    # the intersection keeps it; this only pins the kwarg.
     assert captured["allowed_tools"] == (
         SUPPORT_ALLOWED_TOOLS | MODE_ENTRY_TOOLS
     )
@@ -378,9 +351,7 @@ async def test_hard_mode_on_http_does_not_offer_arming(
         monkeypatch, _isolated_mcp, transport):
     """Arming refuses on HTTP in every state, so do not advertise it.
 
-    Offering it there is a tool whose only possible outcome is an error,
-    and it keeps hard mode on HTTP at exactly the lookup count every doc
-    advertises.
+    That also keeps hard mode on HTTP at the lookup count the docs state.
     """
     from fastmcp import Client
 
@@ -399,8 +370,8 @@ async def test_hard_mode_on_http_does_not_offer_arming(
 
     assert captured["allowed_tools"] == SUPPORT_ALLOWED_TOOLS
 
-    # Through the protocol, not just the kwarg: six files advertise the lookup count
-    # here, and the kwarg cannot see what the intersection does.
+    # Through the protocol: the docs state this count, and the kwarg cannot
+    # show what the intersection does.
     async with Client(_isolated_mcp.mcp) as client:
         names = {t.name for t in await client.list_tools()}
     assert len(names) == len(SUPPORT_ALLOWED_TOOLS)

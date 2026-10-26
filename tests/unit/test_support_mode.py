@@ -1,10 +1,7 @@
 """Unit tests for support read-only mode.
 
-Two jobs here. The first tests keep the allow-list in
-altr_mcp/modes.py honest against the live tool registry, so it cannot
-rot the way the RESTRICTED_TOOLS examples did when 11 tools were renamed
-from delete_* to disconnect_* in 0.4.0. The rest cover the allow-list
-behaviour of ToolRestrictionMiddleware.
+The first tests check the allow-list in altr_mcp/modes.py against the
+live registry. The rest cover ToolRestrictionMiddleware's allow-list.
 """
 import asyncio
 import os
@@ -53,11 +50,9 @@ def registry():
 # ── The allow-list versus the live registry ─────────────────────────────
 
 def test_every_allowed_tool_is_registered(registry):
-    """No stale names.
+    """No stale names: a renamed tool would stay listed and allow nothing.
 
-    This is the check that catches a rename: a tool listed here but no
-    longer registered would silently allow nothing, which is how the
-    pre-0.4.0 delete_* examples came to protect nothing.
+    The pre-0.4.0 delete_* examples rotted this way.
     """
     stale = SUPPORT_ALLOWED_TOOLS - set(registry)
     assert not stale, f"listed in modes.py but not registered: {stale}"
@@ -66,9 +61,7 @@ def test_every_allowed_tool_is_registered(registry):
 def test_allowed_tools_are_read_only_or_justified_searches(registry):
     """Ties the allow-list back to the annotation system.
 
-    A newly added mutating tool follows the existing convention and gets
-    no annotation, so it cannot drift into the allow-list without
-    failing here.
+    A new mutating tool gets no annotation, so it fails here if listed.
     """
     unjustified = {
         name for name in SUPPORT_ALLOWED_TOOLS
@@ -110,11 +103,8 @@ def test_no_destructive_tool_is_allowed(registry):
 def test_detokenization_is_excluded_despite_read_only_hint(registry):
     """The load-bearing exclusion.
 
-    Detokenization carries readOnlyHint=True because it mutates nothing,
-    so the test above would happily admit it. It returns real customer
-    values and must stay out. If this fails because someone widened the
-    allow-list to "everything readOnlyHint", that is the bug, not this
-    test.
+    Detokenization is readOnlyHint=True but returns real customer values.
+    If an "everything readOnlyHint" allow-list fails this, the list is wrong.
     """
     for name in DISCLOSURE_TOOLS:
         assert registry[name]["read_only"] is True, (
@@ -141,9 +131,8 @@ def test_justified_searches_are_actually_unannotated_and_allowed(registry):
 
 
 def test_allow_list_size_matches_the_documented_count(registry):
-    """The numbers 77 and 94 are quoted in docs, .env.example, and both
-    instructions_*.md. Pin them here so adding a tool to modes.py fails
-    loudly instead of silently making all of those wrong."""
+    """Pin 77 and 94, which docs, .env.example and instructions_*.md
+    quote, so a change to modes.py fails here and not silently."""
     assert len(SUPPORT_ALLOWED_TOOLS) == 77, (
         "if this changed on purpose, update README.md,"
         " docs/support-mode.md (which states 77 and the 78 stdio total),"
@@ -173,9 +162,7 @@ def _tool(name):
 async def test_no_allow_list_leaves_everything_visible():
     """Assert the visibility the name promises, not the stored attribute.
 
-    middleware.py has a distinct early-return path for "no filters at
-    all"; asserting `allowed_tools is None` restates the constructor and
-    never reaches it.
+    That reaches middleware.py's early return for "no filters at all".
     """
     m = ToolRestrictionMiddleware(None, None)
     assert m.allowed_tools is None

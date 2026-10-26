@@ -1,17 +1,8 @@
 """Troubleshooting prompts served by the server.
 
-Shipping these as MCP prompts rather than as text on a wiki page fixes
-three things at once. The customer picks one from a menu instead of
-pasting it, so there is nothing to paste wrongly. The guardrail line
-cannot be edited out on the way, because it is not transcribed. And the
-wording versions with the server, so improving a prompt does not mean
-re-sending anything to anyone.
-
-Every prompt opens by telling the model to call `enter_support_mode`.
-That is what makes read-only real for a customer who was never going to
-set an environment variable: enforcement lands in middleware, so a
-later "just change it for me" fails there rather than depending on the
-model still remembering an instruction from ten turns ago.
+Served as MCP prompts, so the guardrail cannot be edited out in transit
+and the wording versions with the server. Every prompt opens by calling
+`enter_support_mode`. See docs/support-mode.md.
 """
 
 from fastmcp import FastMCP
@@ -37,33 +28,12 @@ _ARM = (
 def _q(value: str) -> str:
     """Delimit a caller-supplied value so it cannot close its own quoting.
 
-    Two shapes break a fence, and both are neutralized here. A literal
-    backquote ends it outright. A blank line ends the paragraph the
-    span lives in, so the tail renders as server-authored prose and can
-    even forge a resumption of the sentence it interrupted — which is
-    exactly what the preamble prevents by scoping its disclaimer to the
-    delimited span.
-
-    Collapsed rather than escaped: this is prose for a model, not a
-    data channel, so there is no parser to escape for, and an
-    identifier spanning paragraphs is pasted ticket noise. Both edits
-    are lossy — a MySQL `db`.`table` comes back as 'db'.'table', and a
-    quoted identifier carrying repeated or edge whitespace ("Customer
-    Table") comes back squeezed and trimmed. A model resolves both.
-
-    A value that collapses to nothing gets a placeholder rather than an
-    empty span. "``" is a length-2 backquote string, not a delimiter
-    pair, so two of them pair with *each other* across the prose
-    between — framing the prompt's own instructions as caller-supplied
-    data the preamble has just disclaimed.
-
-    That placeholder deliberately reads unlike the declared defaults
-    ("<ROLE>", "<DB>.<SCHEMA>.<TABLE>"). Those are templates the caller
-    never filled in and the model should substitute; this is a
-    statement that the caller supplied an empty value, which is a
-    different fact and worth not disguising as the first.
+    Backquotes become apostrophes and whitespace collapses, so a blank
+    line cannot end the span. See docs/support-mode.md for the losses.
     """
     collapsed = " ".join(value.replace("`", "'").split())
+    # "``" is not a delimiter pair, so an empty value gets a placeholder,
+    # worded unlike the "<ROLE>" defaults, which mean "not filled in".
     return "`" + (collapsed or "(not supplied)") + "`"
 
 

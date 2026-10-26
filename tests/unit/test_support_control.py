@@ -1,16 +1,6 @@
-"""Unit tests for runtime support mode.
+"""Unit tests for runtime support mode: the controller and its middleware.
 
-The load-bearing claims, and why each is tested:
-
-* A prompt-armed latch is enforced in middleware, not by the model, so a
-  write attempted on a later turn is blocked.
-* An operator-set latch cannot be stood down by any tool. If this
-  regresses, SUPPORT_MODE stops being a guarantee and becomes a default.
-* An unlock covers one call to one named tool and is spent even when
-  that call fails, so it cannot become a standing write permission.
-* Detokenization is never unlockable at any scope.
-* RESTRICTED_TOOLS outranks an unlock, so the operator's deny-list
-  cannot be widened from inside the session.
+See docs/support-mode.md for the claims these pin.
 """
 import pytest
 from fastmcp.exceptions import ToolError
@@ -76,9 +66,7 @@ def test_soft_mode_exposes_the_control_tools():
 def test_hard_mode_withholds_only_the_standdown_tools():
     """The whole point of the hard path: no tool can stand it down.
 
-    Arming stays reachable, because it can only be a no-op there and
-    because every published prompt opens by calling it. Withholding it
-    would make each prompt start by naming a tool that does not exist.
+    Arming stays reachable as a no-op, because every prompt opens with it.
     """
     c = SupportModeController(hard=True)
     assert c.state == "hard"
@@ -301,11 +289,8 @@ async def test_static_allow_list_cannot_be_widened_by_the_controller():
 async def test_two_concurrent_calls_spend_one_unlock_exactly_once():
     """One authorization must mean one write, even under concurrency.
 
-    The low-level MCP server dispatches each request with
-    tg.start_soon(), so two calls to the same unlocked tool can be in
-    flight together. The check-and-consume in on_call_tool is safe only
-    because no await separates them. This test pins that: insert an await
-    between the check and the consume and two writes pass on one unlock.
+    Requests run concurrently, so on_call_tool is safe only while no await
+    separates its check from consume_unlock(). Adding one fails this test.
     """
     import asyncio
 

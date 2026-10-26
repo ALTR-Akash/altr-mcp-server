@@ -1,27 +1,8 @@
 """Runtime support-mode state.
 
-Support mode can be reached two ways, and they are deliberately not
-equally reversible.
-
-HARD, set by the operator via SUPPORT_MODE=true at startup. No tool can
-leave it and no tool can unlock a write. Leaving it means restarting
-without the flag. An operator's decision must not be undoable by the
-model it was meant to constrain.
-
-SOFT, entered at runtime by the ``enter_support_mode`` tool, which is
-the first instruction in every prompt this server ships. A customer who
-was never going to edit a config file still gets middleware-enforced
-read-only, and it costs them nothing. Because they armed it themselves,
-they are also allowed to stand it down: one named write at a time via
-``request_write_unlock``, or entirely via ``exit_support_mode`` with a
-typed confirmation.
-
-The soft path is weaker than the hard path in exactly one way, and it is
-worth being precise about it. Arming depends on the model making the
-first call. Once armed, enforcement is identical: both run in
-ToolRestrictionMiddleware, so "just delete it anyway" on a later turn
-fails in the middleware rather than depending on the model's restraint.
-That later turn was the failure this exists to stop.
+HARD mode (SUPPORT_MODE at startup) cannot be left or unlocked by a tool.
+SOFT mode (armed by ``enter_support_mode``) can. Both enforce in
+ToolRestrictionMiddleware. See docs/support-mode.md.
 """
 
 from datetime import datetime, timezone
@@ -36,22 +17,11 @@ logger = structlog.get_logger(__name__)
 
 State = Literal["off", "soft", "hard"]
 
-#: Arming. The controller offers it in every state, including hard mode,
-#: where it can only ever be a no-op reporting the mode is already on, so
-#: that a published prompt whose first instruction is "call
-#: enter_support_mode" is coherent under both paths; withholding it would
-#: have the model open every investigation by calling a tool that does not
-#: exist.
-#:
-#: Note that main() intersects a static allow-list over this one and omits
-#: this set on the HTTP transports, where mode control refuses outright. So
-#: "offered in hard mode" means offered on stdio. Do not "simplify" the two
-#: lists into agreement: the static list is allowed to narrow this.
+#: Offered in every state, so prompts that open with it work in hard mode,
+#: where it is a no-op. main()'s static list may narrow it, as on HTTP.
 MODE_ENTRY_TOOLS = frozenset({"enter_support_mode"})
 
-#: Standing the mode down. Soft mode only. Withheld in hard mode, because
-#: a mode the operator set in configuration must not be reversible by the
-#: model it was meant to constrain.
+#: Soft mode only: the model must not undo a mode the operator set.
 MODE_STANDDOWN_TOOLS = frozenset({
     "request_write_unlock",
     "exit_support_mode",
@@ -59,13 +29,8 @@ MODE_STANDDOWN_TOOLS = frozenset({
 
 CONTROL_TOOLS = MODE_ENTRY_TOOLS | MODE_STANDDOWN_TOOLS
 
-#: Never unlockable, at any scope, in any mode.
-#:
-#: Detokenization returns real customer values, and the token deletes
-#: destroy them. No troubleshooting fix requires either, so "just this
-#: one call" is never a good enough reason. Keeping these out means a
-#: novice cannot authorize a plaintext read by agreeing to something
-#: that sounded narrow.
+#: Never unlockable, in any mode. These return or destroy real customer
+#: values, and no troubleshooting fix needs either.
 NEVER_UNLOCKABLE = DISCLOSURE_TOOLS | frozenset({
     "critical_delete_tokens",
     "vault_delete_tokens",
@@ -90,11 +55,8 @@ class UnlockRefused(Exception):
 class SupportModeController:
     """Support-mode state for one server process.
 
-    One process serves one client on stdio, so process scope is session
-    scope there. That equivalence does not hold for the HTTP transports,
-    which is why the control tools refuse to run on them: a soft latch
-    is per-process state, and on a shared process one client's latch
-    would silently restrict every other client.
+    On stdio one process serves one client. On HTTP one client's latch
+    would restrict every client, so the control tools refuse there.
     """
 
     def __init__(self, hard: bool = False) -> None:
@@ -174,9 +136,7 @@ class SupportModeController:
         summary = self.journal
         self._state = "off"
         self._pending_unlock = None
-        # Reset, so a second arm-and-exit cycle in the same process reports
-        # only its own activity. Otherwise the summary pasted into a support
-        # ticket over-reports, listing writes from an earlier cycle.
+        # Reset, so the next cycle's summary lists only its own writes.
         self._journal = []
         logger.info("support_mode.exited")
         return summary

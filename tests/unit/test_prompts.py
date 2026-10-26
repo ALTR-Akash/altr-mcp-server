@@ -1,9 +1,7 @@
 """Unit tests for the prompt-argument delimiter.
 
-`_q` is the whole of the injection mitigation, and until now every one
-of its boundaries was reachable only through a rendered prompt, which is
-how three separate escape shapes shipped in succession: a literal
-backquote, a blank line, and a value collapsing to nothing.
+`_q` is the whole injection mitigation, so each escape shape is pinned
+here: a backquote, a blank line, and a value that collapses to nothing.
 """
 from altr_mcp.prompts import _q
 
@@ -50,18 +48,12 @@ def test_a_timestamp_keeps_its_single_space():
 def test_output_is_always_exactly_one_well_formed_span():
     """The invariant the integration test's span model depends on.
 
-    Four clauses, because each escape shape that shipped violated a
-    different one: an interior backquote closed the fence early, a
-    surviving newline unpaired it, and a value collapsing to nothing
-    left an empty span that paired with the next one instead. Asserted
-    over a fuzz list rather than per shape -- checking the shapes
-    already known to be handled is what let each successor through.
+    Each clause blocks one escape shape. A fuzz list, not one case per
+    shape, lets an unknown shape fail too.
     """
     for value in ("", "  ", "``", "a``b", "`", "a\n\nb", "a\u2028b",
                   "  x  y  ", "\x85\x0b\x0c", "`" * 50, "x" * 200,
-                  # Shaped like the declared defaults, which _q()'s
-                  # docstring reasons about and so invites a carve-out
-                  # for. Nothing else in this list enters such a branch.
+                  # Shaped like the "<ROLE>" defaults, to catch a carve-out.
                   "<ROLE>", "<a\n\nb>"):
         out = _q(value)
         assert out.startswith("`") and out.endswith("`"), value
@@ -71,21 +63,15 @@ def test_output_is_always_exactly_one_well_formed_span():
 
 
 def test_a_long_value_survives_intact():
-    """The transform's losses are enumerated in _q()'s docstring.
+    """A real-length value comes back unchanged.
 
-    Nothing else pins that set closed: the structural clauses above all
-    hold for a _q() that silently truncated every value, and the
-    longest value asserted by equality anywhere else is 19 characters.
-    A real argument -- a fully qualified column, a sidecar FQDN -- is
-    longer than that, and a fidelity regression would reach a customer
-    as a wrong-looking identifier with nothing objecting.
+    The structural clauses above still pass if _q() truncates values.
     """
     for value in (
         "PROD_ANALYTICS.PUBLIC.CUSTOMER_ACCOUNTS.SOCIAL_SECURITY_NUMBER",
         "sidecar-prod-01.us-east-1.internal.customer-corp.com",
-        # my_email is a real argument, so an address losing its "@"
-        # reaches the model as a wrong-looking identifier. Equality pins
-        # fidelity only for characters the value actually contains.
+        # Equality pins only the characters a value contains, so cover
+        # the "@" of a my_email argument.
         "first.last+altr@customer-corp.com",
     ):
         assert _q(value) == "`" + value + "`", value

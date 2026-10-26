@@ -1,15 +1,7 @@
-"""Mode-control tools.
+"""Mode-control tools: arm, unlock one write, and leave support mode.
 
-These three tools let a prompt arm read-only enforcement, work inside
-it, and stand it down, none of which requires the customer to edit a
-config file or restart anything. That is the whole point: the customers
-most in need of a guardrail are the least likely to set an environment
-variable correctly.
-
-They refuse to run on the HTTP transports. Soft mode is per-process
-state, and an HTTP process can serve many clients, so one client arming
-it would restrict all of them. On stdio there is one process per client,
-which is what makes process state equal session state.
+They need no config edit or restart. They refuse on the HTTP transports,
+where one client's per-process latch would restrict every client.
 """
 
 import structlog
@@ -50,13 +42,8 @@ def _wrong_transport() -> str | None:
         " can serve multiple clients from one process."
     )
     if get_controller().is_hard:
-        # Not reachable through main(), which withholds every control tool
-        # on the HTTP transports in hard mode. Kept so the message is
-        # right if the tool becomes reachable there again, and for a
-        # server run without the restriction middleware installed.
-        # Telling the operator to set a flag they have already set would
-        # have the model report the server unprotected when it is
-        # hard-latched.
+        # Reached only without the middleware. Advising a flag already set
+        # would have the model report the server unprotected.
         return (
             f"{base} SUPPORT_MODE is already enabled, so read-only"
             " enforcement is in force for this whole process. Proceed"
@@ -68,9 +55,8 @@ def _wrong_transport() -> str | None:
 async def _notify_tool_list_changed() -> None:
     """Ask the client to re-read tools/list.
 
-    Best effort. The enforcement has already happened in the controller
-    by the time this runs, so a client that never refreshes still gets
-    its calls blocked; it just shows a stale list until it does.
+    Best effort: the middleware blocks calls whether or not the client
+    refreshes.
     """
     try:
         await get_context().session.send_tool_list_changed()
@@ -155,15 +141,8 @@ def register(mcp: FastMCP) -> None:
         problem = _wrong_transport()
         if problem:
             return _err(problem)
-        # get_tool() reads the registry directly. mcp.list_tools() would
-        # be wrong here: it runs through this same middleware, so while
-        # support mode is armed it can only ever return the read tools, and
-        # every unlock request would be refused as a nonexistent tool.
-        #
-        # Two contracts across the declared fastmcp range: 3.x returns None
-        # for an unknown tool, earlier versions raise NotFoundError. Handle
-        # both, so a mistyped name is a refusal either way rather than an
-        # unhandled exception on one of the versions we allow.
+        # Not mcp.list_tools(): the middleware filters it to the read tools.
+        # fastmcp 3.x returns None for an unknown tool; earlier versions raise.
         try:
             found = await mcp.get_tool(tool_name)
         except NotFoundError as exc:
@@ -174,10 +153,8 @@ def register(mcp: FastMCP) -> None:
             )
             found = None
         if found is None:
-            # Log here too, and this is the branch that matters: on
-            # fastmcp 3.x a None also covers disabled and auth-denied
-            # tools, so "does not exist" can be a misdiagnosis and this is
-            # the only record that the lookup was attempted at all.
+            # fastmcp 3.x also returns None for disabled and auth-denied
+            # tools, so the error can misdiagnose. This log is the only record.
             logger.debug(
                 "support_mode.unlock_target_unresolved",
                 tool=tool_name,
@@ -186,10 +163,8 @@ def register(mcp: FastMCP) -> None:
                 f"No tool named '{tool_name}' exists in this server."
                 " Check the exact name before requesting an unlock."
             )
-        # RESTRICTED_TOOLS outranks an unlock, so granting one for a denied
-        # tool would report success for a call that then fails with a
-        # different error, and the unlock would never be spent because the
-        # deny-list blocks it before it can be consumed. Refuse up front.
+        # RESTRICTED_TOOLS outranks an unlock and blocks the call before it
+        # spends one, so a grant here would report success and never be spent.
         denied = parse_tool_list(get_settings().restricted_tools)
         if tool_name in denied:
             return _err(
