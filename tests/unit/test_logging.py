@@ -291,6 +291,18 @@ def test_redact_keeps_dict_keys():
         "values": {"ssn": "<redacted>", "email": "<redacted>"}}
 
 
+def test_redact_covers_dam_alerting_free_text():
+    """An ack comment and a rule's filter tree hold free text and search terms."""
+    from altr_mcp.utils.logging import _redact
+
+    tree = {"op": "contains", "dimension": "statement_text",
+            "string_value": SECRET}
+    assert _redact({"comment": SECRET, "filter_tree": tree}) == {
+        "comment": "<redacted>",
+        "filter_tree": {"op": "<redacted>", "dimension": "<redacted>",
+                        "string_value": "<redacted>"}}
+
+
 def test_redact_does_not_touch_tokens():
     """Tokens are not redacted; ALTR's own audit log is keyed by token."""
     from altr_mcp.utils.logging import _redact

@@ -44,6 +44,7 @@ DOMAINS = (
     ("Access Requests", "access-requests.md", "access_request"),
     ("Audits", "audits.md", "audit"),
     ("Audit Reports", "audit-report.md", "audit_report"),
+    ("DAM Alerting", "dam-alerting.md", "dam_alerting"),
     ("Telemetry", "telemetry.md", "telemetry"),
     ("Sidecar Configuration", "sidecar-config.md", "sidecar_config"),
     ("Vault Tokenization", "vault-tokenization.md", "vault_tokenization"),
@@ -63,6 +64,10 @@ DOC_SOURCES = (
 
 # A snake_case identifier: two or more lowercase segments.
 SNAKE_CASE = re.compile(r"\b([a-z][a-z0-9]*(?:_[a-z0-9]+)+)\b")
+
+# API field names that look tool-shaped but are neither tools nor tool
+# parameters. list_value is a DAM Alerting filter-tree field.
+NOT_TOOLS = frozenset({"list_value"})
 
 # A trailing "(N tools)" on a heading or a list item.
 COUNT_SUFFIX = re.compile(r"\((\d+) tools\)")
@@ -147,6 +152,7 @@ def test_documented_tool_names_are_registered(registry, source):
         if token.split("_")[0] in registry["prefixes"]
         and token not in registry["names"]
         and token not in registry["params"]
+        and token not in NOT_TOOLS
     )
     assert not unknown, (
         f"{source} names tools that are not registered: {unknown}\n"
@@ -244,7 +250,7 @@ def test_domain_listing_matches_registry(registry, label, parse):
 
 
 def test_instructions_name_every_domain():
-    """altr_mcp/instructions.md must mention all 13 domains.
+    """altr_mcp/instructions.md must mention every domain.
 
     This file is sent to the model as server instructions on every session,
     so a domain missing from it is a domain the model is less likely to
@@ -292,12 +298,14 @@ DOC_LINK_HOST = re.compile(
 )
 
 # docs.altr.com is the public documentation site; the other two are marketing.
+# docs.dam-alerting is the public DAM Alerting API reference.
 # api/altrnet are the documented default API endpoints, which appear as values
 # in the README settings table and in .env.example rather than as links.
 # Anything else in the altr.com space is internal or per-environment.
 ALLOWED_DOC_HOSTS = {
     "docs.altr.com", "www.altr.com", "altr.com",
     "api.live.altr.com", "altrnet.live.altr.com",
+    "docs.dam-alerting.live.altr.com",
 }
 
 # Everything that leaves the repo: the PyPI long_description, the wheel

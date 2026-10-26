@@ -51,10 +51,10 @@ _REDACTED_ARGS = frozenset({
     "password", "secret", "credentials", "passphrase", "private_key",
     "api_key", "auth_token", "access_key",
     # Human free text, where unannounced PII arrives. Redact it as for `text`.
-    "comments", "attestation", "justification",
-    # An audit search term is the data value someone hunts for. `filters`
-    # carries the same term inside the report-definition filter groups.
-    "statement_text_contains", "filters",
+    "comment", "comments", "attestation", "justification",
+    # An audit search term is the data value someone hunts for. `filters` and
+    # `filter_tree` carry the same term in report filters and DAM rule leaves.
+    "statement_text_contains", "filters", "filter_tree",
 })
 # Matches any argument name, so a new parameter with one of these suffixes is
 # covered. No `_token` suffix, because it would match the pagination cursors.

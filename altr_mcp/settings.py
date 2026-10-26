@@ -61,6 +61,7 @@ class Settings(BaseSettings):
     altr_vault_base_url: Optional[str] = None
     altr_critical_base_url: Optional[str] = None
     altr_kma_base_url: Optional[str] = None
+    altr_dam_alerting_base_url: Optional[str] = None
 
     @computed_field
     @property
@@ -110,6 +111,13 @@ class Settings(BaseSettings):
         if self.altr_kma_base_url:
             return self.altr_kma_base_url
         return f"https://{self.org_id}.kma.live.altr.com/v1"
+
+    @computed_field
+    @property
+    def dam_alerting_base_url(self) -> str:
+        if self.altr_dam_alerting_base_url:
+            return self.altr_dam_alerting_base_url
+        return f"https://{self.org_id}.dam-alerting.live.altr.com/v1/dam-alerting"
 
     @property
     def auth(self) -> httpx.BasicAuth:

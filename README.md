@@ -146,10 +146,10 @@ Every ALTR service endpoint can be pointed elsewhere, which is useful against
 a non-production ALTR environment. All are optional — leave them unset in
 normal use.
 
-The seven per-service endpoints are derived from your `ORG_ID` as
-`https://<ORG_ID>.<service>.live.altr.com`, four of them with a version path
-segment appended. An override replaces the whole value, so it must include that
-path segment where the default has one — see the table.
+The eight per-service endpoints are derived from your `ORG_ID` as
+`https://<ORG_ID>.<service>.live.altr.com`, five of them with a path appended
+(a version, or `/v1/dam-alerting`). An override replaces the whole value, so it
+must include that path where the default has one — see the table.
 
 | Variable | Default |
 |---|---|
@@ -162,6 +162,7 @@ path segment where the default has one — see the table.
 | `ALTR_VAULT_BASE_URL` | `https://<ORG_ID>.vault.live.altr.com/api/v2` |
 | `ALTR_CRITICAL_BASE_URL` | `https://<ORG_ID>.critical.live.altr.com/v2` |
 | `ALTR_KMA_BASE_URL` | `https://<ORG_ID>.kma.live.altr.com/v1` |
+| `ALTR_DAM_ALERTING_BASE_URL` | `https://<ORG_ID>.dam-alerting.live.altr.com/v1/dam-alerting` |
 
 ### Restricting Tools
 
@@ -390,6 +391,7 @@ For a full breakdown of every tool with parameters, behavior, and examples, see 
 | [Access Requests](./docs/access-requests.md) | 6 | Submit, approve, deny, and cancel data access approval requests. |
 | [Audits](./docs/audits.md) | 6 | Search sidecar, Snowflake query, and platform [system audits](https://docs.altr.com/features/database-activity-monitoring/). |
 | [Audit Reports](./docs/audit-report.md) | 17 | Create, schedule, and review structured audit report definitions and instances, including comments and sign-offs. |
+| [DAM Alerting](./docs/dam-alerting.md) | 10 | Create match and threshold alert rules over sidecar and Snowflake audit events; triage, comment on, and acknowledge the alerts they fire. |
 | [Telemetry](./docs/telemetry.md) | 9 | Monitor [ALTR sidecar proxy](https://docs.altr.com/data-sources/oltp/) agent and sidecar instance health. |
 | [Sidecar Configuration](./docs/sidecar-config.md) | 37 | Configure the [ALTR sidecar proxy](https://docs.altr.com/data-sources/oltp/sidecar-integration/) — agents, repos, repo users, service users, sidecars, listeners, and bindings. |
 | [Vault Tokenization](./docs/vault-tokenization.md) | 4 | Tokenize and detokenize values using ALTR vaulted tokenization. |

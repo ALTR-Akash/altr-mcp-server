@@ -107,6 +107,23 @@ def test_audit_report_base_url_override():
     assert s.audit_report_base_url == "https://audit.staging.altr.com/v1"
 
 
+def test_dam_alerting_base_url_defaults_to_org_subdomain():
+    s = Settings(org_id="myorg", mapi_key="k", mapi_secret="s")
+    assert s.dam_alerting_base_url == \
+        "https://myorg.dam-alerting.live.altr.com/v1/dam-alerting"
+
+
+def test_dam_alerting_base_url_override():
+    s = Settings(
+        org_id="myorg",
+        mapi_key="k",
+        mapi_secret="s",
+        altr_dam_alerting_base_url="https://dam.staging.altr.com/v1/dam-alerting",
+    )
+    assert s.dam_alerting_base_url == \
+        "https://dam.staging.altr.com/v1/dam-alerting"
+
+
 def test_vault_base_url_defaults_to_org_subdomain():
     s = Settings(org_id="myorg", mapi_key="k", mapi_secret="s")
     assert s.vault_base_url == \
