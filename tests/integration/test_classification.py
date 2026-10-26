@@ -690,7 +690,7 @@ async def test_update_classifier_sends_every_provided_field(
         "description": "updated",
         "compound_ruleset": {"operator": "AND", "conditions": [
             {"target": "METADATA", "comparator": "contains", "pattern": "ssn"}]},
-        # Only the legacy pattern is cleared; a 0 threshold would match all.
+        # The threshold is not cleared, because a 0 threshold matches all.
         "pattern": None,
     }
 

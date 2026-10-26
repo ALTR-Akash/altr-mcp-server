@@ -140,8 +140,8 @@ def register(mcp: FastMCP) -> None:
             data["description"] = description
         if compound_ruleset is not None:
             data["compound_ruleset"] = compound_ruleset
-            # Retire a legacy top-level pattern; null removes it on the API. The
-            # classifier-level threshold stays: Snowflake reads 0 as match-all.
+            # A null pattern removes a legacy top-level pattern on the API.
+            # Keep the classifier threshold: Snowflake reads 0 as match-all.
             data["pattern"] = None
         response = await classification.update_classifier(
             classifier_name, data, settings.auth)
@@ -760,7 +760,7 @@ def register(mcp: FastMCP) -> None:
         """
         settings = get_settings()
         if sample_strategy == "METADATA":
-            # A metadata scan reads column names only; the API rejects sampling.
+            # The API rejects sampling fields on a metadata scan.
             sample_size, sample_type = None, None
         elif sample_size is None:
             if sample_type == "PERCENT":
