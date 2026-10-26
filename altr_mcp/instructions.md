@@ -33,8 +33,8 @@ consistent meaning:
                          matching get_*_results tool, using the search_uuid
                          or token it returns
 
-Two things this table does not cover. Verbs used by a single domain —
-approve_, deny_, cancel_, archive_, restore_, deactivate_, rotate_, record_,
+Two things this table does not cover. Verbs outside this table — approve_,
+deny_, cancel_, confirm_, archive_, restore_, deactivate_, rotate_, record_,
 revoke_, pin_, unpin_, import_, remove_ — mean what they say; read the tool
 description. And the tokenization domains put the domain first rather than
 the verb: vault_tokenize, critical_delete_tokens. Read the verb after that

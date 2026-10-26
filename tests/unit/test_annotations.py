@@ -46,7 +46,7 @@ GET_LIST_TOOLS = [
     "get_job_findings", "get_job_findings_schemas", "get_job_findings_tables",
     "get_job_findings_columns", "get_job_findings_classifiers",
     "get_job_findings_lineage",
-    "get_job_decisions", "get_job_review_status",
+    "get_job_decisions", "get_job_review_status", "get_job_findings_leaves",
     "get_classification_report",
     # database.py
     "get_databases", "get_database_id", "get_service_users",
@@ -93,7 +93,7 @@ DESTRUCTIVE_TOOLS = [
     "delete_policy", "delete_rule",
     # classification.py
     "delete_classifier", "delete_collection",
-    "revoke_job_decisions",
+    "revoke_job_decisions", "revoke_bulk_job_decision",
     # database.py
     "disconnect_database",
     # telemetry.py
@@ -127,7 +127,8 @@ NO_ANNOTATION_TOOLS = [
     "create_oltp_job", "update_job_status",
     "add_classifiers_to_collection",
     "remove_classifiers_from_collection",
-    "record_job_decision",
+    "record_job_decision", "record_bulk_job_decision",
+    "confirm_job_report", "cancel_job_report",
     # database.py
     "create_database", "create_databricks_database", "update_database",
     "trigger_database_status_sync",
