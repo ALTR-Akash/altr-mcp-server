@@ -63,7 +63,7 @@ DISCLOSURE_TOOLS = frozenset({
     "vault_partial_detokenize",
 })
 
-# The 71 tools available in support mode, grouped by defining module.
+# The 77 tools available in support mode, grouped by defining module.
 SUPPORT_ALLOWED_TOOLS = frozenset({
     # policy.py
     "get_policies", "get_rules", "get_roles",
@@ -78,6 +78,7 @@ SUPPORT_ALLOWED_TOOLS = frozenset({
     "get_job_findings", "get_job_findings_schemas",
     "get_job_findings_tables", "get_job_findings_columns",
     "get_job_findings_classifiers", "get_job_findings_lineage",
+    "get_job_findings_leaves",
     "get_job_decisions", "get_job_review_status",
     "get_classification_report",
     # database.py
@@ -97,6 +98,9 @@ SUPPORT_ALLOWED_TOOLS = frozenset({
     "list_report_instances", "get_report_instance",
     "get_report_instance_download_url", "list_report_comments",
     "get_report_sign_off", "list_report_sign_offs",
+    # dam_alerting.py
+    "list_dam_rules", "get_dam_rule", "list_dam_alerts", "get_dam_alert",
+    "list_dam_alert_comments",
     # sidecar_config.py
     "list_sc_agents", "get_sc_agent", "list_sc_agent_tasks",
     "list_sc_repos", "get_sc_repo", "list_sc_repo_users",

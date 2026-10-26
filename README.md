@@ -93,7 +93,7 @@ Set the following environment variables before starting the server:
 | `MCP_HOST` | No | Bind address for HTTP transports (default: `0.0.0.0`) |
 | `MCP_PORT` | No | Port for HTTP transports (default: `8000`) |
 | `RESTRICTED_TOOLS` | No | Comma-separated tool names to hide from clients |
-| `SUPPORT_MODE` | No | Expose only the 71 read-only tools (default: `false`). See [Support Read-Only Mode](#support-read-only-mode) |
+| `SUPPORT_MODE` | No | Expose only the 77 read-only tools (default: `false`). See [Support Read-Only Mode](#support-read-only-mode) |
 | `SUPPORT_PROMPTS` | No | Publish the troubleshooting prompts over `prompts/list` (default: `false`). See [Troubleshooting Prompts](#troubleshooting-prompts) |
 | `LOG_FORMAT` | No | Log output format: `console` (default) or `json` |
 | `LOG_LEVEL` | No | Log level (default: `INFO`) |
@@ -203,14 +203,14 @@ This is an operator-level safety net — it prevents accidental or unwanted tool
 
 ### Support Read-Only Mode
 
-Set `SUPPORT_MODE=true` to expose only the 71 lookup tools and withhold the other 85 —
+Set `SUPPORT_MODE=true` to expose only the 77 lookup tools and withhold the other 94 —
 everything that changes state, plus the four detokenization tools, which change nothing but
 return real customer values. Intended for support and field engineering investigations,
 where the job is to read configuration and audit history and an accidental write would be a
 production incident.
 
-On stdio `tools/list` reports 72, the 71 lookups plus an inert `enter_support_mode`, so that a
-prompt opening with that call still reads correctly. On the HTTP transports it reports 71.
+On stdio `tools/list` reports 78, the 77 lookups plus an inert `enter_support_mode`, so that a
+prompt opening with that call still reads correctly. On the HTTP transports it reports 77.
 
 ```json
 {

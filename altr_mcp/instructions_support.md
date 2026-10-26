@@ -1,11 +1,9 @@
 SUPPORT READ-ONLY MODE IS ACTIVE
 
-This server is running with SUPPORT_MODE enabled. Only the 71 lookup
+This server is running with SUPPORT_MODE enabled. Only the 77 lookup
 tools are exposed, plus at most an inert `enter_support_mode`. Every
-tool that creates, updates, deletes, disconnects, registers,
-deregisters, triggers, approves, denies, restores, revokes, rotates,
-imports, tokenizes, or detokenizes has been removed from the tool list
-and will be rejected if called. Follow these rules for the whole session.
+tool that changes state, and every tool that detokenizes, has been
+removed from the tool list and will be rejected if called. Follow these rules for the whole session.
 
 1. WRITES ARE NOT AVAILABLE, NOT MERELY DISCOURAGED. When a request
    needs a tool that is not present, do not look for another route to

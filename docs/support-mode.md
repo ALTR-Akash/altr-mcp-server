@@ -1,14 +1,14 @@
 # ALTR MCP Support Read-Only Mode
 
-Support mode exposes only the 71 lookup tools and withholds the other 85:
+Support mode exposes only the 77 lookup tools and withholds the other 94:
 everything that changes state, plus the four detokenization tools, which
 change nothing but return real customer values. Set `SUPPORT_MODE=true` to
 enable it.
 
-On stdio, `tools/list` reports 72 in that mode: the 71 lookups plus
+On stdio, `tools/list` reports 78 in that mode: the 77 lookups plus
 `enter_support_mode`, which is present but inert there so that a prompt whose
 first instruction is to call it still reads correctly. On the HTTP transports it
-reports 71, since mode control refuses there and offering the tool would mean
+reports 77, since mode control refuses there and offering the tool would mean
 advertising a call that can only fail.
 
 It exists for support and field engineering work, where the job is to read
@@ -19,9 +19,8 @@ where an accidental write would be a production incident.
 
 Two things, together:
 
-1. **Restricts the tool set.** The 85 tools that create, update, delete,
-   disconnect, register, deregister, trigger, approve, deny, restore, revoke,
-   rotate, import, tokenize, or detokenize are removed from `tools/list` and
+1. **Restricts the tool set.** The 94 other tools, every one that changes
+   state plus the four detokenization tools, are removed from `tools/list` and
    rejected on `tools/call` with a `support read-only mode` error.
 2. **Appends operating instructions.** The contents of
    `altr_mcp/instructions_support.md` are appended to the server instructions
@@ -213,7 +212,7 @@ in both directions.
 
 **It is an allow-list, not a deny-list.** A tool added in a future release is
 unavailable in support mode until it is added to `SUPPORT_ALLOWED_TOOLS` on
-purpose. A deny-list of the 85 withheld tools would expose anything new by
+purpose. A deny-list of the 94 withheld tools would expose anything new by
 default, which is the wrong failure direction for a safety feature.
 
 **Prompt arguments are framed as data, not instructions.** Every argument is

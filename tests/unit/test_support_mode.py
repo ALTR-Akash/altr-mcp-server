@@ -1,6 +1,6 @@
 """Unit tests for support read-only mode.
 
-Two jobs here. The first four tests keep the allow-list in
+Two jobs here. The first tests keep the allow-list in
 altr_mcp/modes.py honest against the live tool registry, so it cannot
 rot the way the RESTRICTED_TOOLS examples did when 11 tools were renamed
 from delete_* to disconnect_* in 0.4.0. The rest cover the allow-list
@@ -80,6 +80,24 @@ def test_allowed_tools_are_read_only_or_justified_searches(registry):
     )
 
 
+def test_every_read_only_tool_is_allowed_or_a_disclosure(registry):
+    """Makes a new read-only tool a decision, not a silent omission.
+
+    The allow-list fails closed at runtime, so a lookup added without
+    touching modes.py is hidden in support mode and nothing says so.
+    """
+    unclassified = {
+        name for name, flags in registry.items()
+        if flags["read_only"]
+        and name not in SUPPORT_ALLOWED_TOOLS
+        and name not in DISCLOSURE_TOOLS
+    }
+    assert not unclassified, (
+        "readOnlyHint but neither in SUPPORT_ALLOWED_TOOLS nor"
+        f" DISCLOSURE_TOOLS: {sorted(unclassified)}"
+    )
+
+
 def test_no_destructive_tool_is_allowed(registry):
     destructive = {
         name for name in SUPPORT_ALLOWED_TOOLS
@@ -122,12 +140,12 @@ def test_justified_searches_are_actually_unannotated_and_allowed(registry):
 
 
 def test_allow_list_size_matches_the_documented_count():
-    """The number 71 is quoted in docs, .env.example, and both
+    """The number 77 is quoted in docs, .env.example, and both
     instructions_*.md. Pin it here so adding a tool to modes.py fails
     loudly instead of silently making all of those wrong."""
-    assert len(SUPPORT_ALLOWED_TOOLS) == 71, (
+    assert len(SUPPORT_ALLOWED_TOOLS) == 77, (
         "if this changed on purpose, update README.md,"
-        " docs/support-mode.md (which states 71 and the 72 stdio total),"
+        " docs/support-mode.md (which states 77 and the 78 stdio total),"
         " docs/index.md, .env.example, instructions_support.md,"
         " and instructions_mode_control.md"
     )

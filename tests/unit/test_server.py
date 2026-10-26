@@ -379,7 +379,7 @@ async def test_hard_mode_on_http_does_not_offer_arming(
     """Arming refuses on HTTP in every state, so do not advertise it.
 
     Offering it there is a tool whose only possible outcome is an error,
-    and it keeps hard mode on HTTP at exactly the 71 lookups every doc
+    and it keeps hard mode on HTTP at exactly the lookup count every doc
     advertises.
     """
     from fastmcp import Client
@@ -399,7 +399,7 @@ async def test_hard_mode_on_http_does_not_offer_arming(
 
     assert captured["allowed_tools"] == SUPPORT_ALLOWED_TOOLS
 
-    # Through the protocol, not just the kwarg: six files advertise 71
+    # Through the protocol, not just the kwarg: six files advertise the lookup count
     # here, and the kwarg cannot see what the intersection does.
     async with Client(_isolated_mcp.mcp) as client:
         names = {t.name for t in await client.list_tools()}

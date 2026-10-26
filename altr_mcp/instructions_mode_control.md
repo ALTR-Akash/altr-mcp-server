@@ -5,10 +5,9 @@ and no configuration change. Read-only enforcement is not on right now.
 
 1. ARM IT BEFORE TROUBLESHOOTING. When the operator is diagnosing a
    problem rather than making a planned change, call
-   `enter_support_mode` before any other tool. It leaves the 71 lookup
+   `enter_support_mode` before any other tool. It leaves the 77 lookup
    tools available, plus the mode-control tools themselves, and
-   withholds everything that creates, updates, deletes, disconnects,
-   registers, triggers, approves, tokenizes, or detokenizes. If this
+   withholds every tool that changes state or detokenizes. If this
    server publishes troubleshooting prompts, each one begins by telling
    you to do this. Arming it costs the operator nothing.
 
