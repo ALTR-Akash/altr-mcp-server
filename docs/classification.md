@@ -1,6 +1,6 @@
 # Classification Tools (41 tools)
 
-Discover sensitive data in your databases using automated classification. Manage classifiers (pattern-based detectors), group them into collections, and run classification jobs that scan columns for PII, financial data, and other sensitive patterns. Supports Snowflake, OLTP, and Databricks (GDLP only).
+Discover sensitive data in your databases using automated classification. Manage classifiers, group them into collections, and run classification jobs that scan columns for PII, financial data, and other sensitive patterns. Supports Snowflake, OLTP, and Databricks (GDLP only).
 
 ## Tool Summary
 
@@ -95,14 +95,15 @@ Every job creation tool accepts an optional `condition_types` list: the full set
 
 | Value | Description |
 |-------|-------------|
-| `ROW_DATA` | Regex-based sampling of column values (default) |
+| `ROW_DATA` | Regex matching against sampled column values |
 | `METADATA` | Evaluate column name/description against classifier rules |
 | `COLUMN_LOCATION` | Scope evaluation by database/schema/table location |
 | `CONTENT_TYPE` | Detect structured/binary content formats (JSON, PDF, ZIP, etc.) |
 | `DATA_LENGTH` | Evaluate UTF-8 byte length of column values |
 | `COLUMN_SIZE` | Evaluate the declared column size |
-| `AMAZON_COMPREHEND` | AWS Comprehend PII entity detection (requires compound-ruleset classifier) |
+| `AMAZON_COMPREHEND` | AWS Comprehend PII entity detection |
 | `GDLP` | Google DLP info-type detection |
+| `SNOWFLAKE_NATIVE` | Snowflake's own classification tags (`SEMANTIC_CATEGORY` / `PRIVACY_CATEGORY`) on Snowflake jobs |
 | `ENTROPY` | Flag columns whose sampled values look like secret keys (needs row sampling) |
 
 `AMAZON_COMPREHEND` never runs by default. `GDLP` runs by default on GDLP and Databricks jobs and on OLTP jobs with `classification_type` 6; list it in `condition_types` to enable it elsewhere.
@@ -124,7 +125,7 @@ The `classification_type` parameter used across job tools maps to:
 
 ### get_classifiers
 
-List all available data classifiers (pattern-based detectors) in ALTR. Includes both ALTR-managed and custom classifiers.
+List all available data classifiers in ALTR. Includes both ALTR-managed and custom classifiers.
 
 **Parameters:** None
 
@@ -402,7 +403,7 @@ Run a GDLP classification scan on a Databricks connection. Scans all accessible 
 |-----------|------|----------|-------------|
 | `database_id` | int | yes | ALTR database ID for the Databricks connection |
 | `collection_name` | str | no | Any ALTR collection whose classifiers scope this scan (not limited to GDLP collections) — every classifier in it is evaluated, subject to `condition_types`. When omitted, all default Google DLP infoTypes are used |
-| `condition_types` | list[str] | no | Condition targets to evaluate (server defaults to `["GDLP", "METADATA", "COLUMN_LOCATION", "CONTENT_TYPE"]`) |
+| `condition_types` | list[str] | no | Full set of condition targets to evaluate; replaces the server default of `GDLP`, `METADATA`, `COLUMN_LOCATION`, `CONTENT_TYPE` |
 | `requires_review` | bool | no | Hold the report for human review until `confirm_job_report` runs (see [Review-gated jobs](#review-gated-jobs)) |
 
 ---

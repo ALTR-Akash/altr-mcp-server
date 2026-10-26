@@ -1142,13 +1142,15 @@ async def test_create_oltp_job_sends_no_sampling_for_a_metadata_scan(
     assert "sample_size" not in body and "sample_type" not in body
 
 
-async def test_create_oltp_job_keeps_the_row_default(
+async def test_create_oltp_job_sends_percent_sampling(
         httpx_mock: HTTPXMock, test_env, mcp):
     httpx_mock.add_response(status_code=201, json={"job_id": "j1"})
     fn = await get_tool(mcp, "create_oltp_job")
-    await fn(**OLTP_ARGS)
+    await fn(**OLTP_ARGS, sample_strategy="COMBINED",
+             sample_type="PERCENT", sample_size=10)
     body = json.loads(httpx_mock.get_requests()[0].content)
-    assert (body["sample_size"], body["sample_type"]) == (1000, "ROWS")
+    assert (body["sample_strategy"], body["sample_size"],
+            body["sample_type"]) == ("COMBINED", 10, "PERCENT")
 
 
 async def test_create_oltp_job_needs_a_size_for_percent_sampling(

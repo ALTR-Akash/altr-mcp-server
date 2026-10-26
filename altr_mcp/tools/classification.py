@@ -610,10 +610,9 @@ def register(mcp: FastMCP) -> None:
                 evaluate. A list replaces the server default (GDLP, METADATA,
                 COLUMN_LOCATION, CONTENT_TYPE) rather than adding to it, so
                 include every target your classifiers use, GDLP among them.
-                Valid values: GDLP,
-                SNOWFLAKE_NATIVE, ROW_DATA, METADATA, COLUMN_LOCATION,
-                CONTENT_TYPE, DATA_LENGTH, COLUMN_SIZE, AMAZON_COMPREHEND,
-                ENTROPY.
+                Valid values: GDLP, SNOWFLAKE_NATIVE, ROW_DATA, METADATA,
+                COLUMN_LOCATION, CONTENT_TYPE, DATA_LENGTH, COLUMN_SIZE,
+                AMAZON_COMPREHEND, ENTROPY.
             sample_size: Optional rows to sample per column, or a percentage
                 when sample_type is PERCENT (server default 100).
             sample_type: Optional sampling unit: ROWS (a fixed count, the
@@ -676,11 +675,12 @@ def register(mcp: FastMCP) -> None:
                 in the collection is evaluated (GDLP info-type conditions or
                 otherwise), subject to the condition_types evaluation matrix.
                 When omitted, all default Google DLP infoTypes are used.
-            condition_types: Optional condition targets to evaluate. Defaults
-                to ["GDLP", "METADATA", "COLUMN_LOCATION", "CONTENT_TYPE"] on
-                the server when omitted (ROW_DATA is excluded because
+            condition_types: Optional full set of condition targets to
+                evaluate. A list replaces the server default (GDLP, METADATA,
+                COLUMN_LOCATION, CONTENT_TYPE; ROW_DATA is left out because
                 Databricks GDLP does not evaluate classifier regex against
-                samples by default). Valid values: ROW_DATA, METADATA,
+                samples by default) rather than adding to it, so include GDLP
+                if you still want it. Valid values: ROW_DATA, METADATA,
                 COLUMN_LOCATION, GDLP, SNOWFLAKE_NATIVE, CONTENT_TYPE,
                 DATA_LENGTH, COLUMN_SIZE, AMAZON_COMPREHEND, ENTROPY.
             requires_review: If true, hold the report for human review. The
@@ -747,9 +747,10 @@ def register(mcp: FastMCP) -> None:
                 sample_strategy and classification_type; a list replaces that
                 default rather than adding to it. AMAZON_COMPREHEND must be
                 listed to run; GDLP is included by default only for
-                classification_type 6. Valid values: ROW_DATA, METADATA, COLUMN_LOCATION,
-                CONTENT_TYPE, DATA_LENGTH, COLUMN_SIZE, AMAZON_COMPREHEND,
-                GDLP, ENTROPY. Example: ["ROW_DATA", "METADATA"].
+                classification_type 6. Valid values: ROW_DATA, METADATA,
+                COLUMN_LOCATION, CONTENT_TYPE, DATA_LENGTH, COLUMN_SIZE,
+                AMAZON_COMPREHEND, GDLP, ENTROPY. Example:
+                ["ROW_DATA", "METADATA"].
             sid: Oracle SID (Oracle repos only).
             service_name: Oracle service name or alternate connection identifier.
             task_id: Link this on-demand run to an existing scheduled task UUID.
