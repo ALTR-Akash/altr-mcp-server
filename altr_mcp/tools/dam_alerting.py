@@ -85,7 +85,7 @@ def register(mcp: FastMCP) -> None:
             severity: str,
             data_source_scope: str,
             filter_tree: str | dict,
-            enabled: bool = True,
+            enabled: bool = False,
             description: str | None = None,
             email_recipients: list[str] | None = None,
             window_type: str | None = None,
@@ -109,7 +109,7 @@ def register(mcp: FastMCP) -> None:
             rule_type: "match" or "threshold".
             severity: "low", "medium", "high", or "critical".
             data_source_scope: Audit source the rule evaluates. "oltp"
-                (sidecar), "snowflake", or "all" (common dimensions only).
+                (sidecar) or "snowflake".
             filter_tree: Filter as a dict or JSON string. A node is either
                 a junction {"op": "and"|"or", "children": [nodes]} or a
                 leaf {"op": ..., "dimension": ..., <value field>}.
@@ -126,7 +126,7 @@ def register(mcp: FastMCP) -> None:
                 String ops apply to string dimensions; gt/gte/lt/lte/range
                 to numeric ones; key_exists/key_eq to map ones
                 (attributes, snowflake_query_tag).
-                Common dimensions (any scope): user, database, schema,
+                Common dimensions (both scopes): user, database, schema,
                 table, column, statement_type, statement_text, event_name,
                 time_of_day.
                 OLTP only: query_status, repo_user, client_ip, client_app,
@@ -154,7 +154,7 @@ def register(mcp: FastMCP) -> None:
                   {"op": "in", "dimension": "statement_type",
                    "list_value": ["DELETE", "DROP"]}]}
                 Max depth 16, max 256 nodes.
-            enabled: Whether the rule is evaluated (default True).
+            enabled: Whether the rule is evaluated (default False).
             description: Optional description (max 2000 chars).
             email_recipients: Addresses to email when the rule fires (max
                 100). Domains must be allowed for the organization.

@@ -135,7 +135,7 @@ async def test_create_dam_rule_match_minimal(
         "severity": "high",
         "data_source_scope": "oltp",
         "filter_tree": FILTER_TREE,
-        "enabled": True,
+        "enabled": False,
     }
 
 
@@ -149,7 +149,7 @@ async def test_create_dam_rule_threshold_full(
         severity="critical",
         data_source_scope="snowflake",
         filter_tree=json.dumps(FILTER_TREE),
-        enabled=False,
+        enabled=True,
         description="Too many reads",
         email_recipients=["secops@example.com"],
         window_type="hourly",
@@ -160,7 +160,7 @@ async def test_create_dam_rule_threshold_full(
     )
     body = _body(httpx_mock)
     assert body["filter_tree"] == FILTER_TREE
-    assert body["enabled"] is False
+    assert body["enabled"] is True
     assert body["email_recipients"] == ["secops@example.com"]
     assert body["window_type"] == "hourly"
     assert body["threshold"] == 100
@@ -187,7 +187,7 @@ async def test_create_dam_rule_validation_error_passthrough(
     fn = await get_tool(mcp, "create_dam_rule")
     result = await fn(
         name="x", rule_type="match", severity="low",
-        data_source_scope="all", filter_tree=FILTER_TREE)
+        data_source_scope="oltp", filter_tree=FILTER_TREE)
     assert result["data"]["success"] is False
     assert result["data"]["status_code"] == 400
     assert "invalid filter" in result["data"]["body"]

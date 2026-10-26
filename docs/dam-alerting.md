@@ -58,7 +58,7 @@ Limits: depth 16, 256 nodes, 256 entries per list.
 
 | Scope | Dimensions |
 |-------|------------|
-| Any (`oltp`, `snowflake`, `all`) | `user`, `database`, `schema`, `table`, `column`, `statement_type`, `statement_text`, `event_name`, `time_of_day` |
+| Both (`oltp`, `snowflake`) | `user`, `database`, `schema`, `table`, `column`, `statement_type`, `statement_text`, `event_name`, `time_of_day` |
 | `oltp` only | `query_status`, `repo_user`, `client_ip`, `client_app`, `client_port`†, `repo_type`, `repo_host`, `sidecar_id`, `connection_authorized`‡, `authorization_type`, `oltp_row_count`†, `bytes_returned`†, `policy_applied`, `policy_type`, `user_email`, `user_group`, `execution_role`, `execution_database`, `execution_schema`, `execution_warehouse`, `native_statement_type`, `oltp_duration_ms`†, `oltp_rows_inserted`†, `oltp_rows_updated`†, `oltp_rows_deleted`†, `oltp_rows_produced`†, `oltp_rows_unloaded`†, `attributes`§ |
 | `snowflake` only | `snowflake_role`, `snowflake_roles`, `snowflake_warehouse`, `snowflake_warehouse_size`, `snowflake_ip_address`, `snowflake_client`, `snowflake_session_id`, `snowflake_query_tag`§, `snowflake_row_count`†, `snowflake_account`, `snowflake_account_region`, `snowflake_masking_policy`, `snowflake_column_policy`, `snowflake_execution_duration`†, `snowflake_tag_name`, `snowflake_tag_value` |
 
@@ -121,9 +121,9 @@ Create a match or threshold rule.
 | `name` | str | yes | Display name (max 255 chars) |
 | `rule_type` | str | yes | `"match"` or `"threshold"` |
 | `severity` | str | yes | `"low"`, `"medium"`, `"high"`, or `"critical"` |
-| `data_source_scope` | str | yes | `"oltp"`, `"snowflake"`, or `"all"` (common dimensions only) |
+| `data_source_scope` | str | yes | `"oltp"` or `"snowflake"` |
 | `filter_tree` | dict or str | yes | Filter tree; see [Filter Tree](#filter-tree) |
-| `enabled` | bool | no | Evaluate the rule (default `true`) |
+| `enabled` | bool | no | Evaluate the rule (default `false`) |
 | `description` | str | no | Max 2000 chars |
 | `email_recipients` | list[str] | no | Addresses to email when the rule fires (max 100). Domains must be allowed for the org |
 | `window_type` | str | threshold only | `"hourly"`, `"daily"`, `"weekly"`, or `"monthly"` |
