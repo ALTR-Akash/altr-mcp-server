@@ -234,8 +234,8 @@ client, covering what the remaining tools cannot tell you: that this server read
 organization only and never the customer's, that an empty result is not proof of absence, and
 that audit query text should be treated as customer data.
 
-Available tools are those whose names begin with `get_`, `list_`, or `search_`, with two
-deliberate exceptions. The four detokenization tools are withheld even though they are annotated
+Available tools are exactly those whose names begin with `get_`, `list_`, or `search_`. This
+differs from `readOnlyHint` in two ways. The four detokenization tools are withheld even though they are annotated
 `readOnlyHint`, because they return real customer values rather than configuration. The three
 `search_*` audit tools are included even though they carry no annotation, because they POST a
 search request rather than issuing a GET and no audit investigation is possible without them.
@@ -256,7 +256,7 @@ inside a session:
 | --- | --- |
 | `enter_support_mode` | Arms the allow-list for the rest of the session. No restart, no config change. |
 | `request_write_unlock` | Releases exactly one named tool for exactly one call, with a recorded reason, then re-latches. |
-| `exit_support_mode` | Restores every tool, given a confirmation phrase the operator types. Returns a log of what changed while the mode was on. |
+| `exit_support_mode` | Restores every tool, given the phrase `EXIT SUPPORT MODE` typed by the operator. Returns a log of what was attempted while the mode was on. |
 
 Tool visibility updates immediately through a `tools/list_changed` notification, so withheld
 tools disappear from the client rather than failing when called.

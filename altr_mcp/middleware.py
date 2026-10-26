@@ -13,6 +13,7 @@ is not a softer kind of check, it is the same check reading a value that
 can change.
 """
 
+from collections.abc import Set as AbstractSet
 from typing import Iterable, Optional
 
 import structlog
@@ -70,7 +71,7 @@ class ToolRestrictionMiddleware(Middleware):
                 allowed_count=len(self.allowed_tools),
             )
 
-    def _effective_allow_list(self) -> Optional[set[str]]:
+    def _effective_allow_list(self) -> Optional[AbstractSet[str]]:
         """The allow-list in force right now.
 
         A static list and a controller can both be present; the
@@ -82,13 +83,13 @@ class ToolRestrictionMiddleware(Middleware):
             if self.controller is not None
             else None
         )
-        if static is None:
-            return set(live) if live is not None else None
-        if live is None:
-            return static
-        return static & set(live)
+        if static is None or live is None:
+            return live if static is None else static
+        return static & live
 
-    def _withheld_reason(self, tool_name: str) -> Optional[str]:
+    def _withheld_reason(
+        self, tool_name: str, allow: Optional[AbstractSet[str]]
+    ) -> Optional[str]:
         """Return why a tool is unavailable, or None if it is available.
 
         Pure: safe to call from on_list_tools without spending an
@@ -96,7 +97,6 @@ class ToolRestrictionMiddleware(Middleware):
         """
         if tool_name in self.restricted_tools:
             return "access restrictions"
-        allow = self._effective_allow_list()
         if allow is not None and tool_name not in allow:
             return "support read-only mode"
         return None
@@ -109,7 +109,9 @@ class ToolRestrictionMiddleware(Middleware):
         # pending_unlock, so any yield point between that read and the
         # consume lets two parallel calls pass on one authorization.
         # test_two_concurrent_calls_spend_one_unlock_exactly_once covers it.
-        reason = self._withheld_reason(tool_name)
+        reason = self._withheld_reason(
+            tool_name, self._effective_allow_list()
+        )
         if reason is not None:
             logger.warning(
                 "tool_restriction_middleware.blocked",
@@ -120,13 +122,9 @@ class ToolRestrictionMiddleware(Middleware):
                 f"Tool '{tool_name}' is not available"
                 f" due to {reason}"
             )
-        # Available only because an unlock was granted for it: spend the
-        # unlock now, so the next call to the same tool is blocked again.
-        # See the no-await note above.
-        if (
-            self.controller is not None
-            and self.controller.pending_unlock == tool_name
-        ):
+        # Spend any unlock for this tool, so its next call is blocked
+        # again. See the no-await note above.
+        if self.controller is not None:
             self.controller.consume_unlock(tool_name)
         return await call_next(context)
 
@@ -161,15 +159,13 @@ class ToolRestrictionMiddleware(Middleware):
 
     async def on_list_tools(self, context: MiddlewareContext, call_next):
         all_tools = await call_next(context)
-        if (
-            not self.restricted_tools
-            and self._effective_allow_list() is None
-        ):
+        allow = self._effective_allow_list()
+        if not self.restricted_tools and allow is None:
             return all_tools
         self._check_names_once({t.name for t in all_tools})
         filtered = [
             t for t in all_tools
-            if self._withheld_reason(t.name) is None
+            if self._withheld_reason(t.name, allow) is None
         ]
         logger.debug(
             "tool_restriction_middleware.filtered",

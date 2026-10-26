@@ -20,7 +20,6 @@ from fastmcp.server.dependencies import get_context
 from altr_mcp.modes import SUPPORT_ALLOWED_TOOLS, parse_tool_list
 from altr_mcp.settings import get_settings
 from altr_mcp.support_control import (
-    EXIT_PHRASE,
     NEVER_UNLOCKABLE,
     SupportModeLocked,
     SupportModeNotActive,
@@ -93,9 +92,8 @@ def register(mcp: FastMCP) -> None:
 
         Do NOT call this on your own initiative when the operator has
         asked for something to be changed. It withholds every tool that
-        creates, updates, deletes, disconnects, registers, triggers,
-        approves, tokenizes, or detokenizes, leaving the lookup tools and
-        these mode-control tools. Enforcement is in middleware, not in
+        changes state or detokenizes, leaving the lookup tools and these
+        mode-control tools. Enforcement is in middleware, not in
         your judgement: once this is on, a later request to change
         something fails whether or not you agree with it.
 
@@ -104,12 +102,6 @@ def register(mcp: FastMCP) -> None:
         operator then authorizes costs one `request_write_unlock` call
         rather than the exit phrase. Under a SUPPORT_MODE the operator set
         there is no unlock at all: report what is needed and stop.
-
-        If you armed the mode and the operator later authorizes a
-        specific change, use `request_write_unlock` for that one tool
-        rather than leaving the mode, and leave it entirely only with
-        `exit_support_mode`. Neither tool is offered under a SUPPORT_MODE
-        the operator set.
         """
         problem = _wrong_transport()
         if problem:
@@ -235,8 +227,7 @@ def register(mcp: FastMCP) -> None:
         was on, which is worth pasting into the support ticket.
 
         Args:
-            confirmation: The phrase the operator typed. Must be exactly
-                "EXIT SUPPORT MODE".
+            confirmation: The phrase the operator typed, verbatim.
         """
         problem = _wrong_transport()
         if problem:
@@ -246,11 +237,10 @@ def register(mcp: FastMCP) -> None:
         except (SupportModeNotActive, SupportModeLocked, UnlockRefused) as exc:
             return _err(str(exc))
         await _notify_tool_list_changed()
-        writes = [e for e in summary if e["action"] == "write_executed"]
+        writes = [e for e in summary if e["action"] == "write_attempted"]
         return _ok({
             "state": "off",
-            "exit_phrase_required": EXIT_PHRASE,
-            "writes_executed": [e["tool"] for e in writes],
+            "writes_attempted": [e["tool"] for e in writes],
             "session_log": summary,
             "note": (
                 "All tools are available again. Do not run further"

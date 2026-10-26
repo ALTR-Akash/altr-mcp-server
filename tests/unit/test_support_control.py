@@ -132,7 +132,7 @@ def test_exit_with_phrase_restores_everything_and_returns_log():
     assert c.allowed_tools() is None
     actions = [e["action"] for e in summary]
     assert actions == [
-        "entered", "unlock_granted", "write_executed", "exited",
+        "entered", "unlock_granted", "write_attempted", "exited",
     ]
     assert summary[2]["tool"] == "update_rule"
 
@@ -146,14 +146,14 @@ def test_a_second_cycle_reports_only_its_own_activity():
     c.consume_unlock("delete_rule")
     first = c.exit(EXIT_PHRASE)
     assert [
-        e["tool"] for e in first if e["action"] == "write_executed"
+        e["tool"] for e in first if e["action"] == "write_attempted"
     ] == ["delete_rule"]
 
     c.enter_soft()
     second = c.exit(EXIT_PHRASE)
 
     assert [e["action"] for e in second] == ["entered", "exited"]
-    assert not [e for e in second if e["action"] == "write_executed"]
+    assert not [e for e in second if e["action"] == "write_attempted"]
 
 
 def test_exit_when_off_is_an_error_not_a_silent_success():
@@ -328,7 +328,7 @@ async def test_two_concurrent_calls_spend_one_unlock_exactly_once():
         f"expected exactly one write to pass, got {results}"
     )
     assert c.pending_unlock is None
-    writes = [e for e in c.journal if e["action"] == "write_executed"]
+    writes = [e for e in c.journal if e["action"] == "write_attempted"]
     assert len(writes) == 1
 
 

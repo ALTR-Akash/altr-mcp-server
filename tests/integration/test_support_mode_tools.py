@@ -242,9 +242,19 @@ async def test_exit_returns_a_pasteable_session_log(mcp, controller):
     result = await fn(confirmation=EXIT_PHRASE)
 
     assert result["success"] is True
-    assert result["data"]["writes_executed"] == ["update_rule"]
+    assert result["data"]["writes_attempted"] == ["update_rule"]
     assert result["data"]["state"] == "off"
     assert controller.state == "off"
+    assert EXIT_PHRASE not in str(result)
+
+
+async def test_no_tool_description_carries_the_exit_phrase(mcp):
+    """The model has to ask the operator for the phrase."""
+    leaking = [
+        t.name for t in await mcp.list_tools()
+        if EXIT_PHRASE in (t.description or "")
+    ]
+    assert not leaking
 
 
 async def test_exit_refused_in_hard_mode(mcp, monkeypatch):

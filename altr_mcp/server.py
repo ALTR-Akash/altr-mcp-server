@@ -130,7 +130,7 @@ def main(argv=None):
         )
         mcp.instructions = f"{_INSTRUCTIONS}\n\n{_SUPPORT_INSTRUCTIONS}"
 
-    if not settings.support_mode and settings.support_prompts and stdio:
+    elif settings.support_prompts and stdio:
         # Support mode is off but armable mid-session by enter_support_mode.
         # The model has to know that before it calls anything, and
         # instructions are only sent once, at initialize, so the hint cannot

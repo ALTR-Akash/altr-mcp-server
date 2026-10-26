@@ -46,7 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and then re-latches, and `exit_support_mode` restores everything given a
   confirmation phrase the operator types. Tool visibility changes take effect
   immediately via a `tools/list_changed` notification. `exit_support_mode`
-  returns a log of every unlock granted and write executed during the session.
+  returns a log of every unlock granted and write attempted during the session.
 
   A mode set by the operator through `SUPPORT_MODE` cannot be unlocked or
   exited by any tool; leaving it still means restarting without the flag. Only

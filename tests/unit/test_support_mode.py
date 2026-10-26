@@ -20,6 +20,7 @@ from altr_mcp.modes import (
     SEARCH_POST_TOOLS,
     SUPPORT_ALLOWED_TOOLS,
 )
+from altr_mcp.support_control import CONTROL_TOOLS
 from altr_mcp.tools import register_all
 
 
@@ -139,15 +140,20 @@ def test_justified_searches_are_actually_unannotated_and_allowed(registry):
         )
 
 
-def test_allow_list_size_matches_the_documented_count():
-    """The number 77 is quoted in docs, .env.example, and both
-    instructions_*.md. Pin it here so adding a tool to modes.py fails
+def test_allow_list_size_matches_the_documented_count(registry):
+    """The numbers 77 and 94 are quoted in docs, .env.example, and both
+    instructions_*.md. Pin them here so adding a tool to modes.py fails
     loudly instead of silently making all of those wrong."""
     assert len(SUPPORT_ALLOWED_TOOLS) == 77, (
         "if this changed on purpose, update README.md,"
         " docs/support-mode.md (which states 77 and the 78 stdio total),"
         " docs/index.md, .env.example, instructions_support.md,"
         " and instructions_mode_control.md"
+    )
+    withheld = set(registry) - SUPPORT_ALLOWED_TOOLS - CONTROL_TOOLS
+    assert len(withheld) == 94, (
+        "if this changed on purpose, update README.md, CHANGELOG.md"
+        " and docs/support-mode.md"
     )
 
 

@@ -70,7 +70,7 @@ enforcement can be armed from inside a session, by tool call:
 | --- | --- |
 | `enter_support_mode` | Arms the allow-list for the rest of the session. |
 | `request_write_unlock(tool_name, reason)` | Releases one named tool for one call, then re-latches by itself. |
-| `exit_support_mode(confirmation)` | Restores every tool, given the confirmation phrase. Returns the session log. |
+| `exit_support_mode(confirmation)` | Restores every tool, given the confirmation phrase `EXIT SUPPORT MODE` typed by the operator. Returns the session log. |
 
 Every prompt this server publishes opens by telling the client to call
 `enter_support_mode`, so choosing a troubleshooting prompt is what arms the
@@ -107,11 +107,16 @@ same code path: there is no softer kind of check.
 
 The exit confirmation is a speed bump, not a gate. The server cannot tell a
 phrase the operator typed from one the model typed, and the phrase is not a
-secret: it appears in the tool docstring, in this document, and in the success
-payload. What it buys is that a novice cannot be walked into a full exit
-silently, because the model has to surface the request. It does not prevent a
-model that decides to exit from exiting. The unlock-and-relatch path is the part
-that is genuinely enforced, which is why it is the one to prefer.
+secret: it is in this document. No tool description or response carries it, so
+the model has to ask the operator, and a novice cannot be walked into a full
+exit silently. It does not prevent a model that decides to exit from exiting.
+
+`request_write_unlock` needs no operator input at all, only a reason, so in a
+mode the session armed itself a model that has been steered (by text in an
+audit result, say) can reach any unlockable write in two calls. Soft mode stops
+a model that forgets an earlier instruction, not one that has been redirected.
+Prefer the unlock to exiting because it keeps every other write withheld and
+records what was authorized. For a guarantee, use `SUPPORT_MODE`.
 
 Two hard limits, independent of how the mode was armed:
 
@@ -167,18 +172,18 @@ prompts tell it to stop and report when arming errors.
 
 ### Session log
 
-`exit_support_mode` returns every unlock granted and every write executed while
+`exit_support_mode` returns every unlock granted and every write attempted while
 the mode was on:
 
 ```json
 {
   "state": "off",
-  "writes_executed": ["disconnect_sc_sidecar_binding"],
+  "writes_attempted": ["disconnect_sc_sidecar_binding"],
   "session_log": [
     {"action": "entered", "tool": null, "detail": "soft, armed by prompt"},
     {"action": "unlock_granted", "tool": "disconnect_sc_sidecar_binding",
      "detail": "operator authorized removing the stale binding"},
-    {"action": "write_executed", "tool": "disconnect_sc_sidecar_binding"},
+    {"action": "write_attempted", "tool": "disconnect_sc_sidecar_binding"},
     {"action": "exited", "tool": null, "detail": "confirmed by typed phrase"}
   ]
 }
@@ -189,8 +194,8 @@ changed and on whose authority, rather than leaving it to be reconstructed.
 
 ## Which tools are available
 
-Every tool whose name begins with `get_`, `list_`, or `search_`, with one
-deliberate exception in each direction. The authoritative list is
+Exactly the tools whose names begin with `get_`, `list_`, or `search_`.
+Relative to `readOnlyHint` it differs in both directions. The authoritative list is
 `SUPPORT_ALLOWED_TOOLS` in [`altr_mcp/modes.py`](../altr_mcp/modes.py).
 
 **Excluded even though they are annotated `readOnlyHint`:**
@@ -263,5 +268,5 @@ mode as defence in depth, is not available. This mode is the control, not a
 supplement to one.
 
 What support mode does is make the safe path the default one, and make an unsafe
-action require a deliberate act, a restart or a typed phrase, rather than a
-slip.
+action require a deliberate act rather than a slip: a restart under
+`SUPPORT_MODE`, or a visible unlock or exit request in a session-armed mode.

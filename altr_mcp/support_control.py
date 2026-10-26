@@ -162,12 +162,8 @@ class SupportModeController:
                 " restarting the server without SUPPORT_MODE."
             )
         if confirmation != EXIT_PHRASE:
-            # Deliberately does not quote the phrase. Printing it here
-            # handed the model the exact string in the same breath as
-            # telling it not to supply the string, which is self-defeating.
-            # The phrase is not a secret either way (it is in the docstring,
-            # the docs, and the success payload), so this is a speed bump
-            # rather than a gate the server can verify. See docs.
+            # Never quote the phrase in model-visible text, so the model
+            # has to ask the operator for it.
             raise UnlockRefused(
                 "exit_support_mode requires the operator's confirmation"
                 " phrase, typed by them verbatim. Ask the operator for it;"
@@ -221,18 +217,16 @@ class SupportModeController:
         )
 
     def consume_unlock(self, tool_name: str) -> bool:
-        """Spend a pending unlock for ``tool_name``.
+        """Spend a pending unlock for ``tool_name``; return whether one was.
 
-        Returns True if this call was covered by an unlock, which the
-        middleware takes as permission to proceed. The unlock is cleared
-        either way, so a refused or failed call does not leave a second
-        write authorized.
+        Runs before the call, so the journal records an attempt: a refused
+        or failed call still spends the unlock.
         """
         if self._pending_unlock != tool_name:
             return False
         self._pending_unlock = None
-        self._record("write_executed", tool=tool_name)
-        logger.warning("support_mode.write_executed", tool=tool_name)
+        self._record("write_attempted", tool=tool_name)
+        logger.warning("support_mode.write_attempted", tool=tool_name)
         return True
 
     # ── journal ─────────────────────────────────────────────────────────
