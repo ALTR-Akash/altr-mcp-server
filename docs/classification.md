@@ -118,7 +118,7 @@ The `classification_type` parameter used across job tools maps to:
 | `2` | Snowflake Native |
 | `3` | Snowflake Object Tag Import |
 | `4` | Snowflake Native + Tag Import |
-| `5` | ALTR Native (regex) — default for `create_oltp_job` |
+| `5` | ALTR Native — default for `create_oltp_job` |
 | `6` | GDLP BYOK (bring-your-own-key) |
 
 ## Tool Details
