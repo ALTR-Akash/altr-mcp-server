@@ -1156,4 +1156,118 @@ async def test_create_oltp_job_needs_a_size_for_percent_sampling(
     fn = await get_tool(mcp, "create_oltp_job")
     with pytest.raises(Exception, match="required when sample_type is PERCENT"):
         await fn(**OLTP_ARGS, sample_type="PERCENT")
+
+
+# ── review-gated jobs ───────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("tool,args,path", [
+    ("create_job", {"job_type": "FULL", "database_id": 1,
+                    "collection_name": "C"}, "/jobs/snowflake"),
+    ("create_gdlp_job", {"database_id": 1}, "/jobs/snowflake"),
+    ("create_databricks_job", {"database_id": 1}, "/jobs/databricks"),
+    ("create_oltp_job", {"agent_id": "a", "repo_name": "r",
+                         "service_user_name": "s", "collection_name": "C"},
+     "/jobs/oltp"),
+])
+async def test_job_creators_forward_requires_review(
+        httpx_mock: HTTPXMock, test_env, mcp, tool, args, path):
+    """requires_review reaches the body when set, and is omitted otherwise."""
+    httpx_mock.add_response(status_code=201, json={"job_id": "j1"})
+    httpx_mock.add_response(status_code=201, json={"job_id": "j2"})
+    fn = await get_tool(mcp, tool)
+
+    assert (await fn(**args, requires_review=True))["success"] is True
+    assert (await fn(**args))["success"] is True
+
+    gated, default = httpx_mock.get_requests()
+    assert path in str(gated.url)
+    assert json.loads(gated.content)["requires_review"] is True
+    assert "requires_review" not in json.loads(default.content)
+
+
+async def test_get_job_findings_leaves_forwards_filters(
+        httpx_mock: HTTPXMock, test_env, mcp):
+    """Pagination and confidence tiers become query params, tiers repeated."""
+    httpx_mock.add_response(json={"items": [], "next_page_token": None})
+    fn = await get_tool(mcp, "get_job_findings_leaves")
+    result = await fn(job_id="j-1", limit=500, page_token="pt",
+                      confidence=["HIGH", "MEDIUM"])
+    assert result["success"] is True
+    request = httpx_mock.get_requests()[0]
+    assert request.method == "GET"
+    assert request.url.path.endswith("/v1/jobs/j-1/findings/leaves")
+    assert request.url.params.get_list("confidence") == ["HIGH", "MEDIUM"]
+    assert request.url.params["limit"] == "500"
+    assert request.url.params["page_token"] == "pt"
+
+
+async def test_record_bulk_job_decision_sends_the_predicate(
+        httpx_mock: HTTPXMock, test_env, mcp):
+    """Every filter lands in the predicate; dry_run is sent explicitly."""
+    httpx_mock.add_response(json={"bulk_decision_id": "b-1",
+                                  "matched_findings": 12})
+    fn = await get_tool(mcp, "record_bulk_job_decision")
+    result = await fn(
+        job_id="j-1", confirmed_status="approved",
+        classifier_names=["pii_ssn"], confidence=["HIGH"],
+        database="DB", schema="SCH", table="TBL", dry_run=True)
+    assert result["data"]["bulk_decision_id"] == "b-1"
+    request = httpx_mock.get_requests()[0]
+    assert request.method == "POST"
+    assert request.url.path.endswith("/v1/jobs/j-1/decisions/bulk")
+    assert json.loads(request.content) == {
+        "confirmed_status": "approved",
+        "dry_run": True,
+        "predicate": {"classifier_names": ["pii_ssn"], "confidence": ["HIGH"],
+                      "database": "DB", "schema": "SCH", "table": "TBL"},
+    }
+
+
+async def test_record_bulk_job_decision_minimal(
+        httpx_mock: HTTPXMock, test_env, mcp):
+    """Only classifier_names is required; dry_run defaults to false."""
+    httpx_mock.add_response(json={"bulk_decision_id": "b-2"})
+    fn = await get_tool(mcp, "record_bulk_job_decision")
+    await fn(job_id="j-1", confirmed_status="rejected",
+             classifier_names=["pii_email"])
+    assert json.loads(httpx_mock.get_requests()[0].content) == {
+        "confirmed_status": "rejected",
+        "dry_run": False,
+        "predicate": {"classifier_names": ["pii_email"]},
+    }
+
+
+async def test_revoke_bulk_job_decision_encodes_both_ids(
+        httpx_mock: HTTPXMock, test_env, mcp):
+    httpx_mock.add_response(json={"revoked": 12})
+    fn = await get_tool(mcp, "revoke_bulk_job_decision")
+    result = await fn(job_id="j/1", bulk_decision_id="b/1")
+    assert result["success"] is True
+    request = httpx_mock.get_requests()[0]
+    assert request.method == "DELETE"
+    assert request.url.raw_path.decode().endswith(
+        "/v1/jobs/j%2F1/decisions/bulk/b%2F1")
+
+
+@pytest.mark.parametrize("tool,action", [
+    ("confirm_job_report", "confirm"), ("cancel_job_report", "cancel")])
+async def test_report_review_actions_post_without_a_body(
+        httpx_mock: HTTPXMock, test_env, mcp, tool, action):
+    httpx_mock.add_response(status_code=202, json={"status": "ok"})
+    fn = await get_tool(mcp, tool)
+    result = await fn(job_id="j-1")
+    assert result["success"] is True
+    request = httpx_mock.get_requests()[0]
+    assert request.method == "POST"
+    assert request.url.path.endswith(f"/v1/jobs/j-1/report/{action}")
+    assert request.content == b""
+
+
+async def test_record_bulk_job_decision_refuses_an_empty_classifier_list(
+        httpx_mock: HTTPXMock, test_env, mcp):
+    """The engine reads [] as every classifier, so nothing is sent."""
+    fn = await get_tool(mcp, "record_bulk_job_decision")
+    with pytest.raises(Exception, match="at least one classifier"):
+        await fn(job_id="j-1", confirmed_status="approved", classifier_names=[])
     assert not httpx_mock.get_requests()

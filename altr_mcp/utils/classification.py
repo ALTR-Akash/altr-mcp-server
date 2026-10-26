@@ -195,6 +195,8 @@ async def create_job(params: dict, auth) -> dict:
     }
     if params.get("condition_types"):
         data["condition_types"] = params["condition_types"]
+    if params.get("requires_review") is not None:
+        data["requires_review"] = params["requires_review"]
     return await api.request("POST", url, auth, {}, data)
 
 
@@ -212,6 +214,8 @@ async def create_gdlp_job(params: dict, auth) -> dict:
         data["sample_size"] = params["sample_size"]
     if params.get("sample_type"):
         data["sample_type"] = params["sample_type"]
+    if params.get("requires_review") is not None:
+        data["requires_review"] = params["requires_review"]
     return await api.request("POST", url, auth, {}, data)
 
 
@@ -222,6 +226,8 @@ async def create_databricks_job(params: dict, auth) -> dict:
         data["collection_name"] = params["collection_name"]
     if params.get("condition_types"):
         data["condition_types"] = params["condition_types"]
+    if params.get("requires_review") is not None:
+        data["requires_review"] = params["requires_review"]
     return await api.request("POST", url, auth, {}, data)
 
 
@@ -240,6 +246,7 @@ async def create_oltp_job(params: dict, auth) -> dict:
         "sid": params.get("sid"),
         "service_name": params.get("service_name"),
         "task_id": params.get("task_id"),
+        "requires_review": params.get("requires_review"),
     }
     data = {k: v for k, v in data.items() if v is not None}
     return await api.request("POST", url, auth, {}, data)
@@ -250,6 +257,15 @@ async def create_oltp_job(params: dict, auth) -> dict:
 async def get_job_findings(job_id: str, params: dict, auth) -> dict:
     encoded_id = urllib.parse.quote(job_id, safe='')
     url = f"{get_settings().classification_base_url}/v1/jobs/{encoded_id}/findings"
+    return await api.request("GET", url, auth, params)
+
+
+async def get_job_findings_leaves(job_id: str, params: dict, auth) -> dict:
+    encoded_id = urllib.parse.quote(job_id, safe='')
+    url = (
+        f"{get_settings().classification_base_url}"
+        f"/v1/jobs/{encoded_id}/findings/leaves"
+    )
     return await api.request("GET", url, auth, params)
 
 
@@ -347,6 +363,26 @@ async def delete_job_decisions(job_id: str, params: dict, auth) -> dict:
     return await api.request("DELETE", url, auth, params)
 
 
+async def create_bulk_job_decision(job_id: str, data: dict, auth) -> dict:
+    encoded_id = urllib.parse.quote(job_id, safe='')
+    url = (
+        f"{get_settings().classification_base_url}"
+        f"/v1/jobs/{encoded_id}/decisions/bulk"
+    )
+    return await api.request("POST", url, auth, {}, data)
+
+
+async def delete_bulk_job_decision(
+        job_id: str, bulk_decision_id: str, auth) -> dict:
+    encoded_id = urllib.parse.quote(job_id, safe='')
+    encoded_bulk_id = urllib.parse.quote(bulk_decision_id, safe='')
+    url = (
+        f"{get_settings().classification_base_url}"
+        f"/v1/jobs/{encoded_id}/decisions/bulk/{encoded_bulk_id}"
+    )
+    return await api.request("DELETE", url, auth, {})
+
+
 async def get_job_review_status(job_id: str, auth) -> dict:
     encoded_id = urllib.parse.quote(job_id, safe='')
     url = (
@@ -357,6 +393,24 @@ async def get_job_review_status(job_id: str, auth) -> dict:
 
 
 # --- Job report ---
+
+async def confirm_job_report(job_id: str, auth) -> dict:
+    encoded_id = urllib.parse.quote(job_id, safe='')
+    url = (
+        f"{get_settings().classification_base_url}"
+        f"/v1/jobs/{encoded_id}/report/confirm"
+    )
+    return await api.request("POST", url, auth, {})
+
+
+async def cancel_job_report(job_id: str, auth) -> dict:
+    encoded_id = urllib.parse.quote(job_id, safe='')
+    url = (
+        f"{get_settings().classification_base_url}"
+        f"/v1/jobs/{encoded_id}/report/cancel"
+    )
+    return await api.request("POST", url, auth, {})
+
 
 async def _create_job_report(params: dict, auth, job_id: str) -> dict:
     encoded_id = urllib.parse.quote(job_id, safe='')
