@@ -1,6 +1,6 @@
 # Classification Tools (41 tools)
 
-Discover sensitive data in your databases using automated classification. Manage classifiers (pattern-based detectors), group them into collections, and run classification jobs that scan columns for PII, financial data, and other sensitive patterns. Supports Snowflake, OLTP, and Databricks (GDLP only).
+Discover sensitive data in your databases using automated classification. Manage classifiers, group them into collections, and run classification jobs that scan columns for PII, financial data, and other sensitive patterns. Supports Snowflake, OLTP, and Databricks (GDLP only).
 
 ## Tool Summary
 
@@ -8,7 +8,7 @@ Discover sensitive data in your databases using automated classification. Manage
 |------|-------------|
 | `get_classifiers` | List all available data classifiers |
 | `get_classifier` | Get details for a single classifier |
-| `create_classifier` | Create a custom classifier (regex or compound ruleset) |
+| `create_classifier` | Create a custom classifier defined by a compound ruleset |
 | `update_classifier` | Update an existing custom classifier |
 | `delete_classifier` | Remove a custom classifier |
 | `get_collections` | List classifier collections |
@@ -91,20 +91,22 @@ To abandon a review instead, call `cancel_job_report`.
 
 ## Condition Types
 
-Several job creation tools accept an optional `condition_types` list that controls which evaluation targets run during a scan. Without it, only `ROW_DATA` (regex sampling) runs by default.
+Every job creation tool accepts an optional `condition_types` list: the full set of evaluation targets for the scan. When it is omitted, the server picks a default for the job type. A list replaces that default rather than adding to it, so include every target your classifiers use. An omitted target is not evaluated, and its conditions count as passing within an AND.
 
 | Value | Description |
 |-------|-------------|
-| `ROW_DATA` | Regex-based sampling of column values (default) |
+| `ROW_DATA` | Regex matching against sampled column values |
 | `METADATA` | Evaluate column name/description against classifier rules |
 | `COLUMN_LOCATION` | Scope evaluation by database/schema/table location |
 | `CONTENT_TYPE` | Detect structured/binary content formats (JSON, PDF, ZIP, etc.) |
 | `DATA_LENGTH` | Evaluate UTF-8 byte length of column values |
 | `COLUMN_SIZE` | Evaluate the declared column size |
-| `AMAZON_COMPREHEND` | AWS Comprehend PII entity detection (requires compound-ruleset classifier) |
+| `AMAZON_COMPREHEND` | AWS Comprehend PII entity detection |
 | `GDLP` | Google DLP info-type detection |
+| `SNOWFLAKE_NATIVE` | Snowflake's own classification tags (`SEMANTIC_CATEGORY` / `PRIVACY_CATEGORY`) on Snowflake jobs |
+| `ENTROPY` | Flag columns whose sampled values look like secret keys (needs row sampling) |
 
-`AMAZON_COMPREHEND` and `GDLP` are never activated by default — they must be explicitly listed in `condition_types`.
+`AMAZON_COMPREHEND` never runs by default. `GDLP` runs by default on GDLP and Databricks jobs and on OLTP jobs with `classification_type` 6; list it in `condition_types` to enable it elsewhere.
 
 ## Classification Types
 
@@ -116,14 +118,14 @@ The `classification_type` parameter used across job tools maps to:
 | `2` | Snowflake Native |
 | `3` | Snowflake Object Tag Import |
 | `4` | Snowflake Native + Tag Import |
-| `5` | ALTR Native (regex) — default for `create_oltp_job` |
+| `5` | ALTR Native — default for `create_oltp_job` |
 | `6` | GDLP BYOK (bring-your-own-key) |
 
 ## Tool Details
 
 ### get_classifiers
 
-List all available data classifiers (pattern-based detectors) in ALTR. Includes both ALTR-managed and custom classifiers.
+List all available data classifiers in ALTR. Includes both ALTR-managed and custom classifiers.
 
 **Parameters:** None
 
@@ -141,20 +143,13 @@ Get details for a single classifier by name.
 
 ### create_classifier
 
-Create a custom data classifier. Supports two authoring modes:
-
-**Regex mode** — provide `pattern`, `minimum_threshold`, and `sample_size` to detect column values matching a regex.
-
-**Compound ruleset mode** — provide `compound_ruleset` for advanced classifiers that combine multiple condition types (METADATA, AMAZON_COMPREHEND, DATA_LENGTH, CONTENT_TYPE, etc.) using AND/OR logic.
+Create a custom data classifier defined by a compound ruleset: one or more conditions (ROW_DATA regex, METADATA, AMAZON_COMPREHEND, DATA_LENGTH, CONTENT_TYPE and more) combined with AND/OR. A plain regex classifier is a ruleset with a single ROW_DATA condition carrying the pattern and its `minimum_threshold`. Sampling is set on the job, not the classifier.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `classifier_name` | str | yes | Unique name for the classifier |
+| `compound_ruleset` | dict | yes | Nested AND/OR condition tree |
 | `description` | str | no | Human-readable explanation of what it detects |
-| `minimum_threshold` | int | no | Percent (0-100) confidence required (regex mode) |
-| `pattern` | str | no | Regex pattern used to match values (regex mode) |
-| `sample_size` | int | no | Number of values ALTR should sample per column |
-| `compound_ruleset` | dict | no | Nested AND/OR condition tree (compound mode) |
 
 **Compound ruleset structure:**
 ```json
@@ -182,21 +177,20 @@ Create a custom data classifier. Supports two authoring modes:
 
 **DATA_LENGTH / COLUMN_SIZE leaf fields:** `length` or `size`, numeric `comparator` (`greater_than`/`less_than`/`equals`/etc.), optional `trim`.
 
-All conditions support `negated: true`.
+**ENTROPY leaf fields** (flags values that look like secret keys): `minimum_evidence_bits`, `minimum_key_bits`, `alphabet_classes`, `decode_base64`, `cumulative`.
+
+Always set `minimum_threshold` on ROW_DATA leaves. All conditions support `negated: true`.
 
 ---
 
 ### update_classifier
 
-Update an existing custom classifier. Only provided fields are changed.
+Update an existing custom classifier. Only provided fields are changed. Passing `compound_ruleset` also removes any legacy top-level pattern, so the ruleset alone decides matches. To keep a legacy regex, include it as a ROW_DATA condition with its own `minimum_threshold`.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `classifier_name` | str | yes | Exact classifier name to update |
 | `description` | str | no | Updated description |
-| `minimum_threshold` | int | no | Updated confidence threshold (0-100) |
-| `pattern` | str | no | Updated regex pattern |
-| `sample_size` | int | no | Updated sample size |
 | `compound_ruleset` | dict | no | Updated compound ruleset |
 
 ---
@@ -331,7 +325,7 @@ Check the status of classification jobs. Jobs run asynchronously and can take 10
 | `limit` | int | no | Max jobs to return (default 50, max 50) |
 | `contiguous_id` | str | no | Pagination token from a prior call |
 | `status` | str | no | Filter by status: `RUNNING`, `PAUSED`, `COMPLETED`, `CANCELLED`, `FAILED` |
-| `job_type` | str | no | Filter by type: `FULL`, `INCREMENTAL`, `RECLASSIFICATION` |
+| `job_type` | str | no | Filter by type: `FULL` or `INCREMENTAL` |
 | `database_id` | int | no | Restrict to a specific database |
 | `agent_id` | str | no | Restrict to jobs run by a specific CLASSIFIER agent UUID |
 | `classification_type` | int | no | Filter by type code (1–6; see [Classification Types](#classification-types)) |
@@ -378,10 +372,10 @@ Run an ALTR-native classification scan on a Snowflake database. Jobs run asynchr
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `job_type` | str | yes | Job type: `FULL`, `INCREMENTAL`, or `RECLASSIFICATION` |
+| `job_type` | str | yes | Job type: `FULL` or `INCREMENTAL` |
 | `database_id` | int | yes | Target database ID (from `get_databases` / `get_database_id`) |
 | `collection_name` | str | yes | Classifier collection to use for this run |
-| `condition_types` | list[str] | no | Additional condition targets to enable (see [Condition Types](#condition-types)) |
+| `condition_types` | list[str] | no | Full set of condition targets to evaluate; replaces the server default (see [Condition Types](#condition-types)) |
 | `requires_review` | bool | no | Hold the report for human review until `confirm_job_report` runs (see [Review-gated jobs](#review-gated-jobs)) |
 
 ---
@@ -394,9 +388,9 @@ Run a GDLP (Google DLP) classification scan on a Snowflake connection. Posts to 
 |-----------|------|----------|-------------|
 | `database_id` | int | yes | ALTR database ID for the Snowflake connection |
 | `collection_name` | str | no | Any ALTR collection whose classifiers scope this scan (not limited to GDLP collections) — every classifier in it is evaluated, subject to `condition_types`. When omitted, all default Google DLP infoTypes are used |
-| `condition_types` | list[str] | no | Additional condition targets to enable |
-| `sample_size` | int | no | Rows to sample per column (server defaults to 100) |
-| `sample_type` | str | no | Sampling unit (server defaults to `ROWS`) |
+| `condition_types` | list[str] | no | Full set of condition targets to evaluate; replaces the server default of `GDLP`, `METADATA`, `COLUMN_LOCATION`, `CONTENT_TYPE` |
+| `sample_size` | int | no | Rows to sample per column, or a percentage when `sample_type` is `PERCENT` (server defaults to 100) |
+| `sample_type` | str | no | Sampling unit: `ROWS` (a fixed count, the server default) or `PERCENT` |
 | `requires_review` | bool | no | Hold the report for human review until `confirm_job_report` runs (see [Review-gated jobs](#review-gated-jobs)) |
 
 ---
@@ -409,7 +403,7 @@ Run a GDLP classification scan on a Databricks connection. Scans all accessible 
 |-----------|------|----------|-------------|
 | `database_id` | int | yes | ALTR database ID for the Databricks connection |
 | `collection_name` | str | no | Any ALTR collection whose classifiers scope this scan (not limited to GDLP collections) — every classifier in it is evaluated, subject to `condition_types`. When omitted, all default Google DLP infoTypes are used |
-| `condition_types` | list[str] | no | Condition targets to evaluate (server defaults to `["GDLP", "METADATA", "COLUMN_LOCATION", "CONTENT_TYPE"]`) |
+| `condition_types` | list[str] | no | Full set of condition targets to evaluate; replaces the server default of `GDLP`, `METADATA`, `COLUMN_LOCATION`, `CONTENT_TYPE` |
 | `requires_review` | bool | no | Hold the report for human review until `confirm_job_report` runs (see [Review-gated jobs](#review-gated-jobs)) |
 
 ---
@@ -425,10 +419,10 @@ Run an on-demand classification scan on an OLTP database (Oracle, MSSQL, MySQL, 
 | `service_user_name` | str | yes | Repo service user the agent authenticates as (from `list_sc_service_users`) |
 | `collection_name` | str | yes | Classifier collection to run |
 | `classification_type` | int | no | Type code: `5` (ALTR Native, default) or `6` (GDLP BYOK) |
-| `sample_strategy` | str | no | `ROWS`, `METADATA`, `ROW_COUNT`, `ROW_PERCENT`, or `COMBINED`. Default `ROWS` |
-| `sample_size` | int | no | Values sampled per column. Default `1000` |
-| `sample_type` | str | no | Sampling unit. Default `ROWS` |
-| `condition_types` | list[str] | no | Condition targets to enable. Required for METADATA scans, AMAZON_COMPREHEND, DATA_LENGTH, COLUMN_SIZE, or CONTENT_TYPE |
+| `sample_strategy` | str | no | `ROWS`, `METADATA`, or `COMBINED`. Default `ROWS`; GDLP BYOK supports `ROWS` only |
+| `sample_size` | int | no | Rows sampled per column (default `1000`), or a percentage from 1 to 100 when `sample_type` is `PERCENT`, where it is required. Not sent for `METADATA` |
+| `sample_type` | str | no | Sampling unit: `ROWS` (a fixed count, default) or `PERCENT`. Not sent for `METADATA` |
+| `condition_types` | list[str] | no | Full set of condition targets to evaluate; replaces the default derived from `sample_strategy` and `classification_type`. `AMAZON_COMPREHEND` must be listed to run; `GDLP` is included by default only for `classification_type` 6 |
 | `sid` | str | no | Oracle SID (Oracle repos only) |
 | `service_name` | str | no | Oracle service name or alternate connection identifier |
 | `task_id` | str | no | Link this on-demand run to an existing scheduled task UUID |

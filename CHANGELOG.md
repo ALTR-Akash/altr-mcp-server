@@ -20,6 +20,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `get_job_findings_leaves` lists every finding in a job in one paginated
   stream, optionally filtered by confidence tier.
 
+### Changed
+- Classifiers are defined through `compound_ruleset` only, and
+  `create_classifier` now requires it. A regex classifier is a ruleset with
+  a single ROW_DATA condition carrying the pattern and its
+  `minimum_threshold`; sampling is configured on the job.
+- `update_classifier` with a `compound_ruleset` also removes any legacy
+  top-level pattern, so the ruleset alone decides matches. Include a
+  ROW_DATA condition to keep a legacy regex. Classifiers not updated keep
+  their existing definition.
+
+### Removed
+- The `pattern`, `minimum_threshold` and `sample_size` parameters of
+  `create_classifier` and `update_classifier`.
+
+### Fixed
+- The classification job tools describe only the option values the API
+  accepts: `job_type` is `FULL` or `INCREMENTAL`, `create_oltp_job`'s
+  `sample_strategy` is `ROWS`, `METADATA` or `COMBINED`, and `sample_type`
+  is `ROWS` or `PERCENT`. `ENTROPY` is listed as a condition type and a
+  classifier condition target.
+- The job tools describe `condition_types` as the full set of targets to
+  evaluate, which replaces the server default rather than adding to it.
+- `create_oltp_job` with `sample_strategy` `METADATA` no longer sends
+  sampling fields, which the API rejects for a metadata scan, and with
+  `sample_type` `PERCENT` it asks for `sample_size` instead of sending the
+  row-count default.
+
 ## [0.7.1]
 
 ### Security

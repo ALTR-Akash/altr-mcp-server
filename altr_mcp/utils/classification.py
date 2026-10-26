@@ -41,12 +41,8 @@ async def create_classifier(params: dict, auth) -> dict:
     data = {
         "classifier_name": params.get("classifier_name"),
         "description": params.get("description"),
-        "minimum_threshold": params.get("minimum_threshold"),
-        "pattern": params.get("pattern"),
-        "sample_size": params.get("sample_size"),
+        "compound_ruleset": params.get("compound_ruleset"),
     }
-    if params.get("compound_ruleset") is not None:
-        data["compound_ruleset"] = params["compound_ruleset"]
     data = {k: v for k, v in data.items() if v is not None}
     return await api.request("POST", url, auth, {}, data)
 

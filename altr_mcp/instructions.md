@@ -2,7 +2,7 @@ ALTR MCP server for managing data security on Snowflake, Databricks, and OLTP da
 
 IMPORTANT: Classification jobs (create_job, create_gdlp_job, create_databricks_job) are async and can take 10-30+ minutes. After creating a job, stop and tell the user to wait for completion. Poll with get_jobs until status is COMPLETED before calling get_classification_report.
 
-IMPORTANT: GDLP (Google DLP) classification is a SEPARATE job type from ALTR-native classification. GDLP does NOT use classifier collections — it calls Google DLP's API directly. Use `create_gdlp_job` (Snowflake) or `create_databricks_job` (Databricks) for GDLP scans. Use `create_job` with a `collection_name` only for ALTR-native regex-based classification.
+IMPORTANT: GDLP (Google DLP) classification is a SEPARATE job type from ALTR-native classification. GDLP does NOT use classifier collections — it calls Google DLP's API directly. Use `create_gdlp_job` (Snowflake) or `create_databricks_job` (Databricks) for GDLP scans. Use `create_job` with a `collection_name` only for ALTR-native classification.
 
 IMPORTANT: TAG HANDLING DIFFERS BY PLATFORM. Snowflake and Databricks tags are fundamentally different objects in ALTR — do not confuse them.
 
@@ -79,7 +79,7 @@ Common workflow (end-to-end Snowflake setup):
 
   1. Discover existing state — databases, tags, policies, roles
   2. Run a classification job to find sensitive columns
-     - ALTR-native (regex classifiers): create_job — requires collection_name
+     - ALTR-native (ALTR classifiers): create_job — requires collection_name
      - GDLP (Google DLP): create_gdlp_job — requires only database_id, no collection
      IMPORTANT: Classification jobs are async and can take 10-30+ minutes.
      After creating a job, STOP and tell the user to wait for it to finish.

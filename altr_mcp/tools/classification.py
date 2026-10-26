@@ -15,8 +15,7 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
     @log_tool
     async def get_classifiers() -> dict:
-        """List all available data classifiers
-        (pattern-based detectors) in ALTR.
+        """List all available data classifiers in ALTR.
 
         Classifiers automatically detect sensitive data
         types like SSNs, emails,
@@ -45,27 +44,18 @@ def register(mcp: FastMCP) -> None:
     @log_tool
     async def create_classifier(
             classifier_name: str,
-            description: str | None = None,
-            minimum_threshold: int | None = None,
-            pattern: str | None = None,
-            sample_size: int | None = None,
-            compound_ruleset: dict | None = None
+            compound_ruleset: dict,
+            description: str | None = None
             ) -> dict:
-        """Create a custom data classifier for detecting specific data patterns.
+        """Create a custom data classifier defined by a compound ruleset.
 
-        Prefer **compound ruleset mode** for new classifiers — even a single
-        ROW_DATA condition — so all detection logic lives in one consistent,
-        composable place. The legacy top-level `pattern` field still works but
-        is discouraged.
-
-        **Compound ruleset mode (preferred)** — provide `compound_ruleset` for
-        classifiers that combine one or more condition types (ROW_DATA regex,
-        METADATA column-name matching, AMAZON_COMPREHEND entity detection,
-        DATA_LENGTH, CONTENT_TYPE, GDLP info-types, etc.) using AND/OR logic.
-
-        **Regex mode (legacy)** — provide a top-level `pattern` and
-        `minimum_threshold`. Equivalent to a single ROW_DATA condition; kept
-        for backward compatibility. Sampling is set on the job, not here.
+        All detection logic lives in `compound_ruleset`: one or more
+        conditions (ROW_DATA regex, METADATA column-name matching,
+        AMAZON_COMPREHEND entity detection, DATA_LENGTH, CONTENT_TYPE, GDLP
+        info-types and more) combined with AND/OR. A plain regex classifier
+        is a ruleset with a single ROW_DATA condition carrying the pattern
+        and its minimum_threshold. Always set minimum_threshold on ROW_DATA
+        leaves. Sampling is set on the job, not here.
 
         Compound ruleset structure:
         ```json
@@ -89,7 +79,7 @@ def register(mcp: FastMCP) -> None:
 
         Valid `target` values: ROW_DATA, METADATA, COLUMN_LOCATION, GDLP,
         SNOWFLAKE_NATIVE, CONTENT_TYPE, DATA_LENGTH, COLUMN_SIZE,
-        AMAZON_COMPREHEND.
+        AMAZON_COMPREHEND, ENTROPY.
 
         AMAZON_COMPREHEND leaf fields: `entity_type` (e.g. "SSN", "CREDIT_DEBIT_NUMBER",
         "EMAIL"), `minimum_score` (0.0–1.0, default 0.5).
@@ -104,28 +94,21 @@ def register(mcp: FastMCP) -> None:
         `dominance_threshold`. Formats: JSON, XML, CSV, PDF, DOCX, XLSX, PNG,
         JPEG, ZIP, GZIP, PARQUET, and more.
 
+        ENTROPY leaf fields (flags values that look like secret keys):
+        `minimum_evidence_bits`, `minimum_key_bits`, `alphabet_classes`,
+        `decode_base64`, `cumulative`.
+
         All leaf conditions support `negated: true`.
 
         Args:
             classifier_name: Unique name for the classifier.
+            compound_ruleset: Nested AND/OR condition tree, as above.
             description: Human-readable explanation of what it detects.
-            minimum_threshold: Percent (0-100) confidence required
-                to consider a column a match (legacy regex mode).
-            pattern: Regex pattern used to match values (legacy regex mode;
-                prefer a ROW_DATA condition in `compound_ruleset`).
-            sample_size: Legacy and discouraged — sampling is configured at the
-                job level (`create_job` / `create_gdlp_job` / `create_oltp_job`),
-                not on the classifier. Retained only for backward compatibility.
-            compound_ruleset: Nested AND/OR condition tree (preferred).
-                When provided, `pattern` and `minimum_threshold` are optional.
         """
         settings = get_settings()
         params = {
             "classifier_name": classifier_name,
             "description": description,
-            "minimum_threshold": minimum_threshold,
-            "pattern": pattern,
-            "sample_size": sample_size,
             "compound_ruleset": compound_ruleset,
         }
         response = await classification.create_classifier(
@@ -137,22 +120,17 @@ def register(mcp: FastMCP) -> None:
     async def update_classifier(
             classifier_name: str,
             description: str | None = None,
-            minimum_threshold: int | None = None,
-            pattern: str | None = None,
-            sample_size: int | None = None,
             compound_ruleset: dict | None = None
             ) -> dict:
         """Update an existing custom classifier. Only provided fields are changed.
 
+        Passing `compound_ruleset` also removes any legacy top-level pattern,
+        so the ruleset alone decides matches. To keep a legacy regex, include
+        it as a ROW_DATA condition with its own minimum_threshold.
+
         Args:
             classifier_name: Exact classifier name to update.
             description: Updated description.
-            minimum_threshold: Updated confidence threshold (0-100).
-            pattern: Updated regex pattern (legacy; prefer a ROW_DATA condition
-                in `compound_ruleset`).
-            sample_size: Legacy and discouraged — sampling is configured at the
-                job level, not on the classifier. Retained for backward
-                compatibility.
             compound_ruleset: Updated compound ruleset. See `create_classifier`
                 for structure and valid condition targets.
         """
@@ -160,14 +138,11 @@ def register(mcp: FastMCP) -> None:
         data = {}
         if description is not None:
             data["description"] = description
-        if minimum_threshold is not None:
-            data["minimum_threshold"] = minimum_threshold
-        if pattern is not None:
-            data["pattern"] = pattern
-        if sample_size is not None:
-            data["sample_size"] = sample_size
         if compound_ruleset is not None:
             data["compound_ruleset"] = compound_ruleset
+            # A null pattern removes a legacy top-level pattern on the API.
+            # Keep the classifier threshold: Snowflake reads 0 as match-all.
+            data["pattern"] = None
         response = await classification.update_classifier(
             classifier_name, data, settings.auth)
         return {"success": True, "data": response, "error": None}
@@ -453,8 +428,7 @@ def register(mcp: FastMCP) -> None:
                 `get_jobs` call.
             status: Filter by job status (e.g. RUNNING,
                 PAUSED, COMPLETED, CANCELLED, FAILED).
-            job_type: Filter by job type (FULL,
-                INCREMENTAL, RECLASSIFICATION).
+            job_type: Filter by job type (FULL or INCREMENTAL).
             database_id: Restrict to a specific database
                 (numeric ID from `get_databases` /
                 `get_database_id`).
@@ -563,7 +537,7 @@ def register(mcp: FastMCP) -> None:
             ) -> dict:
         """Run an ALTR-native classification scan on a Snowflake database.
 
-        Uses ALTR's own regex-based classifiers grouped in a collection.
+        Uses ALTR's own classifiers grouped in a collection.
         This is NOT for GDLP (Google DLP) scans — use `create_gdlp_job`
         for that instead.
 
@@ -574,14 +548,18 @@ def register(mcp: FastMCP) -> None:
         `get_classification_report` to view results.
 
         Args:
-            job_type: Job type to run (FULL, INCREMENTAL, RECLASSIFICATION).
+            job_type: Job type to run (FULL or INCREMENTAL).
             database_id: Target database ID (from
                 `get_databases` / `get_database_id`).
             collection_name: Classifier collection to use for this run.
-            condition_types: Optional list of condition targets to enable
-                beyond ROW_DATA. Valid values: ROW_DATA, METADATA,
-                COLUMN_LOCATION, CONTENT_TYPE, DATA_LENGTH, COLUMN_SIZE.
-                GDLP and AMAZON_COMPREHEND require separate job types.
+            condition_types: Optional full set of condition targets to
+                evaluate. A list replaces the server default rather than
+                adding to it, so include every target your classifiers use;
+                an omitted target is not evaluated and its conditions count
+                as passing within an AND. Valid values: ROW_DATA, METADATA,
+                COLUMN_LOCATION, SNOWFLAKE_NATIVE, CONTENT_TYPE, DATA_LENGTH,
+                COLUMN_SIZE, ENTROPY. GDLP and AMAZON_COMPREHEND require
+                separate job types.
             requires_review: If true, hold the report for human review. The
                 job pauses at AWAITING_REVIEW until every finding is decided
                 and `confirm_job_report` runs. Defaults to false.
@@ -628,12 +606,17 @@ def register(mcp: FastMCP) -> None:
                 in the collection is evaluated (GDLP info-type conditions or
                 otherwise), subject to the condition_types evaluation matrix.
                 When omitted, all default Google DLP infoTypes are used.
-            condition_types: Optional additional condition targets to enable.
-                Valid values: ROW_DATA, METADATA, COLUMN_LOCATION,
-                CONTENT_TYPE, DATA_LENGTH, COLUMN_SIZE, AMAZON_COMPREHEND.
-            sample_size: Optional number of rows to sample per column
-                (defaults to 100 on the server when omitted).
-            sample_type: Optional sampling unit (defaults to ROWS).
+            condition_types: Optional full set of condition targets to
+                evaluate. A list replaces the server default (GDLP, METADATA,
+                COLUMN_LOCATION, CONTENT_TYPE) rather than adding to it, so
+                include every target your classifiers use, GDLP among them.
+                Valid values: GDLP, SNOWFLAKE_NATIVE, ROW_DATA, METADATA,
+                COLUMN_LOCATION, CONTENT_TYPE, DATA_LENGTH, COLUMN_SIZE,
+                AMAZON_COMPREHEND, ENTROPY.
+            sample_size: Optional rows to sample per column, or a percentage
+                when sample_type is PERCENT (server default 100).
+            sample_type: Optional sampling unit: ROWS (a fixed count, the
+                default) or PERCENT.
             requires_review: If true, hold the report for human review. The
                 job pauses at AWAITING_REVIEW until every finding is decided
                 and `confirm_job_report` runs. Defaults to false.
@@ -692,13 +675,14 @@ def register(mcp: FastMCP) -> None:
                 in the collection is evaluated (GDLP info-type conditions or
                 otherwise), subject to the condition_types evaluation matrix.
                 When omitted, all default Google DLP infoTypes are used.
-            condition_types: Optional condition targets to evaluate. Defaults
-                to ["GDLP", "METADATA", "COLUMN_LOCATION", "CONTENT_TYPE"] on
-                the server when omitted (ROW_DATA is excluded because
+            condition_types: Optional full set of condition targets to
+                evaluate. A list replaces the server default (GDLP, METADATA,
+                COLUMN_LOCATION, CONTENT_TYPE; ROW_DATA is left out because
                 Databricks GDLP does not evaluate classifier regex against
-                samples by default). Valid values: ROW_DATA, METADATA,
+                samples by default) rather than adding to it, so include GDLP
+                if you still want it. Valid values: ROW_DATA, METADATA,
                 COLUMN_LOCATION, GDLP, SNOWFLAKE_NATIVE, CONTENT_TYPE,
-                DATA_LENGTH, COLUMN_SIZE, AMAZON_COMPREHEND.
+                DATA_LENGTH, COLUMN_SIZE, AMAZON_COMPREHEND, ENTROPY.
             requires_review: If true, hold the report for human review. The
                 job pauses at AWAITING_REVIEW until every finding is decided
                 and `confirm_job_report` runs. Defaults to false.
@@ -723,7 +707,7 @@ def register(mcp: FastMCP) -> None:
             collection_name: str,
             classification_type: int = 5,
             sample_strategy: str = "ROWS",
-            sample_size: int = 1000,
+            sample_size: int | None = None,
             sample_type: str = "ROWS",
             condition_types: list[str] | None = None,
             sid: str | None = None,
@@ -750,15 +734,23 @@ def register(mcp: FastMCP) -> None:
             collection_name: Classifier collection to run.
             classification_type: ALTR classification type code (default 5=ALTR
                 Native). Valid values: 5=ALTR Native, 6=GDLP BYOK.
-            sample_strategy: Sampling strategy: ROWS, METADATA, ROW_COUNT,
-                ROW_PERCENT, or COMBINED (default ROWS).
-            sample_size: Number of values sampled per column (default 1000).
-            sample_type: Sampling unit (default ROWS).
-            condition_types: Condition targets to enable. Required to activate
-                METADATA-only scans, AMAZON_COMPREHEND, DATA_LENGTH, COLUMN_SIZE,
-                or CONTENT_TYPE evaluation. Valid values: ROW_DATA, METADATA,
+            sample_strategy: Sampling strategy: ROWS (sampled row data),
+                METADATA (column names only) or COMBINED (both). Default ROWS;
+                GDLP BYOK supports ROWS only.
+            sample_size: Rows sampled per column (default 1000), or a
+                percentage from 1 to 100 when sample_type is PERCENT, where it
+                is required. Not sent for METADATA, which samples no rows.
+            sample_type: Sampling unit: ROWS (a fixed count, default) or
+                PERCENT. Not sent for METADATA.
+            condition_types: Optional full set of condition targets to
+                evaluate. When omitted the server derives it from
+                sample_strategy and classification_type; a list replaces that
+                default rather than adding to it. AMAZON_COMPREHEND must be
+                listed to run; GDLP is included by default only for
+                classification_type 6. Valid values: ROW_DATA, METADATA,
                 COLUMN_LOCATION, CONTENT_TYPE, DATA_LENGTH, COLUMN_SIZE,
-                AMAZON_COMPREHEND, GDLP. Example: ["ROW_DATA", "METADATA"].
+                AMAZON_COMPREHEND, GDLP, ENTROPY. Example:
+                ["ROW_DATA", "METADATA"].
             sid: Oracle SID (Oracle repos only).
             service_name: Oracle service name or alternate connection identifier.
             task_id: Link this on-demand run to an existing scheduled task UUID.
@@ -767,6 +759,14 @@ def register(mcp: FastMCP) -> None:
                 and `confirm_job_report` runs. Defaults to false.
         """
         settings = get_settings()
+        if sample_strategy == "METADATA":
+            # The API rejects sampling fields on a metadata scan.
+            sample_size, sample_type = None, None
+        elif sample_size is None:
+            if sample_type == "PERCENT":
+                raise ValueError(
+                    "sample_size (1-100) is required when sample_type is PERCENT.")
+            sample_size = 1000
         params = {
             "agent_id": agent_id,
             "repo_name": repo_name,
