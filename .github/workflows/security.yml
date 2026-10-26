@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Run Trivy
         uses: aquasecurity/trivy-action@v0.36.0
@@ -58,7 +58,7 @@ jobs:
         run: python3 .github/scripts/summarize_findings.py trivy trivy-results.sarif > findings.md
 
       - if: failure() && github.event_name == 'schedule'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: findings-security
           path: findings.md
@@ -77,11 +77,11 @@ jobs:
       contents: read
       issues: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
           sparse-checkout: .github/scripts
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         continue-on-error: true  # nothing to download if the check never finished
         with:
           pattern: findings-*
